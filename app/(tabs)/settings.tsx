@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import Constants from 'expo-constants';
 
 import { deleteAll } from '@/src/repo/workoutRepo';
 import { useUnitPreference } from '@/src/state/unitPreference';
@@ -17,6 +18,11 @@ import { exportAllToJson, exportSetsToCsv } from '@/src/usecases/export';
 export default function SettingsScreen() {
   const { unit, setUnit } = useUnitPreference();
   const [exporting, setExporting] = useState(false);
+  const version = Constants.expoConfig?.version ?? '0.0.0';
+  const buildNumber =
+    Constants.expoConfig?.ios?.buildNumber ??
+    Constants.expoConfig?.android?.versionCode?.toString() ??
+    '-';
 
   const handleExportJson = async () => {
     setExporting(true);
@@ -52,6 +58,10 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const handleFeedback = () => {
+    Alert.alert('Feedback', 'Feedback form is coming soon.');
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -80,6 +90,27 @@ export default function SettingsScreen() {
           </Pressable>
           <Pressable style={styles.actionButton} onPress={handleExportCsv} disabled={exporting}>
             <Text style={styles.actionText}>Export CSV</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Appearance</Text>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Theme</Text>
+            <Text style={styles.rowValue}>Auto (System)</Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Version</Text>
+            <Text style={styles.rowValue}>
+              {version} ({buildNumber})
+            </Text>
+          </View>
+          <Pressable style={styles.actionButton} onPress={handleFeedback}>
+            <Text style={styles.actionText}>Send Feedback</Text>
           </Pressable>
         </View>
 
@@ -152,6 +183,18 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontWeight: '600',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rowLabel: {
+    fontWeight: '600',
+    color: '#333',
+  },
+  rowValue: {
+    color: '#666',
   },
   dangerButton: {
     borderColor: '#f2b5b5',
