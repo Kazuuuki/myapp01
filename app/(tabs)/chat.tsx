@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
-  ImageSourcePropType,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,32 +14,16 @@ import {
 } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AI_CHAT_ENDPOINT, buildAiChatRequest } from '@/constants/ai-config';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import * as ImagePicker from 'expo-image-picker';
-
-type Attachment = {
-  id: string;
-  kind: 'image';
-  source: ImageSourcePropType;
-  label: string;
-};
 
 type Message = {
   id: string;
   role: 'user' | 'bot';
   text: string;
   status?: 'sending' | 'sent' | 'failed';
-  attachments?: Attachment[];
 };
-
-const SAMPLE_IMAGE = require('@/assets/images/react-logo.png');
-
-const BOT_REPLIES = [
-  'Thanks for the details. For now, try keeping your chest up and slow down the eccentric.',
-  'I can help with form feedback. If you attach a photo, I will focus on priority fixes.',
-  'Based on your note, I would keep volume steady and reduce load for a week.',
-];
 
 function makeId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -51,91 +33,22 @@ export default function ChatScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const [input, setInput] = useState('');
-  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [messages, setMessages] = useState<Message[]>(() => [
     {
       id: makeId(),
       role: 'bot',
       text: 'Hi! Share your training goal or attach a form photo for feedback.',
     },
-    {
-      id: makeId(),
-      role: 'user',
-      text: 'I want better squat depth. Any quick cues? ',
-      status: 'sent',
-    },
-    {
-      id: makeId(),
-      role: 'bot',
-      text: 'Start with a slightly wider stance and keep the weight mid-foot. Try 3 slow reps.',
-    },
-    {
-      id: makeId(),
-      role: 'user',
-      text: 'Uploading a photo now.',
-      status: 'failed',
-      attachments: [
-        {
-          id: makeId(),
-          kind: 'image',
-          source: SAMPLE_IMAGE,
-          label: 'Form photo',
-        },
-      ],
-    },
   ]);
   const listRef = useRef<FlatList<Message>>(null);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const replyIndex = useRef(0);
-
-  useEffect(() => {
-    return () => {
-      timers.current.forEach((timer) => clearTimeout(timer));
-    };
-  }, []);
 
   const handleAttach = () => {
-    (async () => {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Permission required', 'Allow photo library access to attach images.');
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
-        selectionLimit: 0,
-        quality: 1,
-      });
-      if (result.canceled || result.assets.length === 0) {
-        return;
-      }
-      const next = result.assets.map((asset) => ({
-        id: makeId(),
-        kind: 'image' as const,
-        source: { uri: asset.uri },
-        label: asset.fileName ?? 'Form photo',
-      }));
-      setPendingAttachments((prev) => [...prev, ...next]);
-    })();
+    Alert.alert('Images coming soon', 'Image upload is not available yet. Please send text for now.');
   };
 
   const sendDisabled = useMemo(() => {
-    return input.trim().length === 0 && pendingAttachments.length === 0;
-  }, [input, pendingAttachments.length]);
-
-  const pushBotReply = () => {
-    const nextText = BOT_REPLIES[replyIndex.current % BOT_REPLIES.length];
-    replyIndex.current += 1;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: makeId(),
-        role: 'bot',
-        text: nextText,
-      },
-    ]);
-  };
+    return input.trim().length === 0;
+  }, [input]);
 
   const markMessageStatus = (id: string, status: Message['status']) => {
     setMessages((prev) =>
@@ -143,15 +56,33 @@ export default function ChatScreen() {
     );
   };
 
-  const simulateSend = (id: string) => {
-    const sendTimer = setTimeout(() => {
+  const sendToApi = async (id: string, text: string) => {
+    try {
+      const response = await fetch(AI_CHAT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildAiChatRequest(text)),
+      });
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
+      const data = (await response.json()) as { text?: string };
+      const reply = data.text?.trim();
+      if (!reply) {
+        throw new Error('Empty response');
+      }
       markMessageStatus(id, 'sent');
-      const replyTimer = setTimeout(() => {
-        pushBotReply();
-      }, 600);
-      timers.current.push(replyTimer);
-    }, 900);
-    timers.current.push(sendTimer);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: makeId(),
+          role: 'bot',
+          text: reply,
+        },
+      ]);
+    } catch (error) {
+      markMessageStatus(id, 'failed');
+    }
   };
 
   const handleSend = () => {
@@ -159,31 +90,27 @@ export default function ChatScreen() {
       return;
     }
     const text = input.trim();
+    if (!text) {
+      return;
+    }
     const nextMessage: Message = {
       id: makeId(),
       role: 'user',
-      text: text.length > 0 ? text : 'Photo attached.',
+      text,
       status: 'sending',
-      attachments: pendingAttachments.length ? pendingAttachments : undefined,
     };
     setMessages((prev) => [...prev, nextMessage]);
     setInput('');
-    setPendingAttachments([]);
-    simulateSend(nextMessage.id);
+    sendToApi(nextMessage.id, text);
   };
 
   const handleRetry = (id: string) => {
+    const message = messages.find((item) => item.id === id);
+    if (!message) {
+      return;
+    }
     markMessageStatus(id, 'sending');
-    simulateSend(id);
-  };
-
-  const renderAttachment = (attachment: Attachment) => {
-    return (
-      <View key={attachment.id} style={styles.attachmentWrap}>
-        <Image source={attachment.source} style={styles.attachmentImage} />
-        <Text style={[styles.attachmentLabel, { color: colors.mutedText }]}>{attachment.label}</Text>
-      </View>
-    );
+    sendToApi(id, message.text);
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
@@ -203,11 +130,6 @@ export default function ChatScreen() {
         <View style={styles.messageBody}>
           <View style={bubbleStyle}>
             <Text style={[styles.messageText, { color: textColor }]}>{item.text}</Text>
-            {item.attachments?.length ? (
-              <View style={styles.attachmentGroup}>
-                {item.attachments.map(renderAttachment)}
-              </View>
-            ) : null}
           </View>
           {item.status === 'sending' ? (
             <View style={styles.statusRow}>
@@ -246,36 +168,6 @@ export default function ChatScreen() {
           onLayout={() => listRef.current?.scrollToEnd({ animated: false })}
         />
 
-        {pendingAttachments.length ? (
-          <View style={[styles.pendingAttachment, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-            <View style={styles.pendingList}>
-              {pendingAttachments.map((attachment) => (
-                <View key={attachment.id} style={styles.pendingItem}>
-                  <Image source={attachment.source} style={styles.pendingImage} />
-                  <View style={styles.pendingTextWrap}>
-                    <Text style={[styles.pendingTitle, { color: colors.text }]} numberOfLines={1}>
-                      {attachment.label}
-                    </Text>
-                    <Text style={[styles.pendingSubtitle, { color: colors.mutedText }]}>Ready to send</Text>
-                  </View>
-                  <Pressable
-                    style={[styles.removeButton, { borderColor: colors.border }]}
-                    onPress={() =>
-                      setPendingAttachments((prev) => prev.filter((item) => item.id !== attachment.id))
-                    }>
-                    <Text style={[styles.removeButtonText, { color: colors.text }]}>Remove</Text>
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-            <Pressable
-              style={[styles.removeButton, { borderColor: colors.border }]}
-              onPress={() => setPendingAttachments([])}>
-              <Text style={[styles.removeButtonText, { color: colors.text }]}>Clear all</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
         <View style={[styles.composer, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <Pressable style={styles.iconButton} onPress={handleAttach}>
             <IconSymbol name="paperclip" size={22} color={colors.text} />
@@ -298,6 +190,9 @@ export default function ChatScreen() {
             <IconSymbol name="paperplane.fill" size={18} color={sendDisabled ? colors.mutedText : colors.primaryText} />
           </Pressable>
         </View>
+        <Text style={[styles.helperText, { color: colors.mutedText }]}>
+          Image uploads are not available yet. Text chat only for now.
+        </Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -370,21 +265,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  attachmentGroup: {
-    gap: 8,
-  },
-  attachmentWrap: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  attachmentImage: {
-    width: 200,
-    height: 120,
-  },
-  attachmentLabel: {
-    fontSize: 11,
-    paddingTop: 6,
-  },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -393,48 +273,6 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-  },
-  pendingAttachment: {
-    gap: 10,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    padding: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  pendingList: {
-    gap: 10,
-  },
-  pendingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  pendingImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-  },
-  pendingTextWrap: {
-    flex: 1,
-    gap: 2,
-  },
-  pendingTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  pendingSubtitle: {
-    fontSize: 12,
-  },
-  removeButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  removeButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   composer: {
     flexDirection: 'row',
@@ -459,5 +297,10 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  helperText: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    fontSize: 12,
   },
 });
