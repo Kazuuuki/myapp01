@@ -45,8 +45,6 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
     removeSet,
     pastePreviousSets,
     removeExercise,
-    undo,
-    undoAvailable,
   } = useTodaySession(date);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -137,11 +135,6 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
             <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
             <Text style={[styles.subtitle, { color: colors.mutedText }]}>{subtitle ?? date}</Text>
           </View>
-          {undoAvailable ? (
-            <Pressable style={[styles.undoButton, { borderColor: colors.primary }]} onPress={undo}>
-              <Text style={[styles.undoText, { color: colors.text }]}>Undo</Text>
-            </Pressable>
-          ) : null}
         </View>
 
         <Pressable style={[styles.addTrigger, { backgroundColor: colors.primary }]} onPress={() => setIsAddOpen(true)}>
@@ -367,15 +360,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   modalGhostText: {
-    fontWeight: '600',
-  },
-  undoButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  undoText: {
     fontWeight: '600',
   },
   keyboardAvoid: {

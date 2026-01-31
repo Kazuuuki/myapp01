@@ -18,13 +18,10 @@ import {
   deleteSetsBySessionAndExercise,
   getLastSessionByExerciseBeforeDate,
   getLastSetByExercise,
-  getSetById,
   getSetsBySession,
   getSetsBySessionAndExercise,
-  restoreSet,
   updateSet,
 } from '@/src/repo/setRepo';
-import { getLastAction, setLastAction } from '@/src/state/lastAction';
 
 export async function getOrCreateSessionByDate(date: string): Promise<WorkoutSession> {
   const existing = await getSessionByDate(date);
@@ -111,26 +108,14 @@ export async function addSetQuick(sessionId: string, exerciseId: string) {
   const lastSet = await getLastSetByExercise(exerciseId);
   const weight = lastSet?.weight ?? 0;
   const reps = lastSet?.reps ?? 10;
-  const created = await addSet(sessionId, exerciseId, weight, reps);
-  setLastAction({ type: 'add_set', setId: created.id });
-  return created;
+  return addSet(sessionId, exerciseId, weight, reps);
 }
 
 export async function updateSetQuick(setId: string, weight: number, reps: number) {
-  const previous = await getSetById(setId);
-  if (!previous) {
-    return;
-  }
-  setLastAction({ type: 'update_set', setId, previousWeight: previous.weight, previousReps: previous.reps });
   await updateSet(setId, weight, reps);
 }
 
 export async function deleteSetQuick(setId: string) {
-  const previous = await getSetById(setId);
-  if (!previous) {
-    return;
-  }
-  setLastAction({ type: 'delete_set', set: previous });
   await deleteSet(setId);
 }
 
@@ -151,25 +136,5 @@ export async function pastePreviousSetsToSession(
   for (const set of previousSets) {
     await addSet(sessionId, exerciseId, set.weight, set.reps);
   }
-  return true;
-}
-
-export async function undoLastAction() {
-  const lastAction = getLastAction();
-  if (!lastAction) {
-    return false;
-  }
-
-  if (lastAction.type === 'add_set') {
-    await deleteSet(lastAction.setId);
-  }
-  if (lastAction.type === 'update_set') {
-    await updateSet(lastAction.setId, lastAction.previousWeight, lastAction.previousReps);
-  }
-  if (lastAction.type === 'delete_set') {
-    await restoreSet(lastAction.set);
-  }
-
-  setLastAction(null);
   return true;
 }

@@ -13,7 +13,7 @@
 - `src/repo/` SQL を発行するリポジトリ層
 - `src/usecases/` 画面ロジック（ユースケース）
 - `src/ui/` 再利用 UI コンポーネント
-- `src/state/` 状態管理（Undo など）
+- `src/state/` 状態管理
 
 **主要ファイル**
 - `src/models/types.ts`
@@ -94,7 +94,6 @@
 - `addSetQuick(sessionId, exerciseId)`
   - 直近の重量/回数をデフォルト値として追加。
 - `updateSetQuick(setId, weight, reps)`
-- `undoLastAction()`
 
 ### 4.2 history.ts
 - `listSessionsWithStats()`
@@ -113,7 +112,6 @@
 1. `getOrCreateTodaySession` で当日セッションを取得
 2. 種目カード一覧表示
 3. 種目追加 / セット追加 / セット更新
-4. Undo ボタンで直前の操作を取り消し
 
 使用 UI: `ExerciseCard`, `SetChip`, `NumberStepper`
 
@@ -138,41 +136,29 @@
 
 ---
 
-## 6. Undo 仕様
-- `src/state/lastAction` に直前操作を保存
-- 対象操作
-  - set 追加
-  - set 更新
-  - set 削除
-- Undo は 1 回分のみ
-
----
-
-## 7. エクスポート
+## 6. エクスポート
 - JSON: 全テーブルを出力
 - CSV: `set_records` を出力（主に分析用）
 
 ---
 
-## 8. 実装順（推奨）
+## 7. 実装順（推奨）
 1. DB schema & repo
 2. today usecase + Today 画面
 3. セッション詳細・履歴一覧
 4. 種目詳細
 5. 設定/エクスポート
-6. Undo
 
 ---
 
-## 9. QA チェック
+## 8. QA チェック
 - 追加/更新/削除が保存される
-- Undo が期待通り動作する
 - 履歴一覧・セッション詳細の整合性が取れている
 - 種目詳細の集計値が正しい
 
 ---
 
-## 10. 注意点
+## 9. 注意点
 - 日付はローカル日付（YYYY-MM-DD）で一貫させる
 - 1日1セッション前提（複数にするなら設計変更が必要）
 - 初回起動時の DB 初期化タイミングに注意

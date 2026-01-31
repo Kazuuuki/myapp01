@@ -10,17 +10,14 @@ import {
   getTodayExercises,
   pastePreviousSetsToSession,
   removeExerciseFromToday,
-  undoLastAction,
   updateSetQuick,
 } from '@/src/usecases/today';
-import { getLastAction } from '@/src/state/lastAction';
 
 export function useTodaySession(date: string) {
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [exercises, setExercises] = useState<ExerciseWithSets[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [undoAvailable, setUndoAvailable] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!session) {
@@ -28,7 +25,6 @@ export function useTodaySession(date: string) {
     }
     const items = await getTodayExercises(session.id, date);
     setExercises(items);
-    setUndoAvailable(!!getLastAction());
   }, [session]);
 
   const init = useCallback(async () => {
@@ -38,7 +34,6 @@ export function useTodaySession(date: string) {
       setSession(current);
       const items = await getTodayExercises(current.id, date);
       setExercises(items);
-      setUndoAvailable(!!getLastAction());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load session');
     } finally {
@@ -124,13 +119,6 @@ export function useTodaySession(date: string) {
     [date, refresh, session],
   );
 
-  const undo = useCallback(async () => {
-    const didUndo = await undoLastAction();
-    if (didUndo) {
-      await refresh();
-    }
-  }, [refresh]);
-
   return {
     session,
     exercises,
@@ -143,8 +131,6 @@ export function useTodaySession(date: string) {
     updateSet,
     removeSet,
     pastePreviousSets,
-    undo,
-    undoAvailable,
     refresh,
   };
 }
