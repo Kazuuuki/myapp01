@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
 import { Colors } from '@/constants/theme';
@@ -24,6 +24,7 @@ import { getExerciseSummary } from '@/src/usecases/exerciseDetail';
 
 export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const { unit } = useUnitPreference();
@@ -95,7 +96,17 @@ export default function ExerciseDetailScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.topRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.back()}
+            style={[styles.backButton, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.backText, { color: colors.text }]}>{'<'}</Text>
+          </Pressable>
+        </View>
         <Text style={[styles.title, { color: colors.text }]}>{summary.exercise.name}</Text>
         <Text style={[styles.bodyPart, { color: colors.mutedText }]}>Body part: {summary.exercise.bodyPart ?? '-'}</Text>
 
@@ -214,6 +225,10 @@ export default function ExerciseDetailScreen() {
   );
 }
 
+export const options = {
+  headerShown: false,
+};
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -221,6 +236,22 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     gap: 16,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 12,
+  },
+  backButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  backText: {
+    fontSize: 20,
+    fontWeight: '600',
   },
   title: {
     fontSize: 24,

@@ -28,9 +28,10 @@ type Props = {
   date: string;
   title: string;
   subtitle?: string;
+  showBack?: boolean;
 };
 
-export function SessionDayScreen({ date, title, subtitle }: Props) {
+export function SessionDayScreen({ date, title, subtitle, showBack = false }: Props) {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -131,6 +132,14 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
+          {showBack ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.back()}
+              style={[styles.backButton, { borderColor: colors.border }]}>
+              <Text style={[styles.backText, { color: colors.text }]}>{'<'}</Text>
+            </Pressable>
+          ) : null}
           <View>
             <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
             <Text style={[styles.subtitle, { color: colors.mutedText }]}>{subtitle ?? date}</Text>
@@ -274,8 +283,19 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    gap: 12,
+  },
+  backButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  backText: {
+    fontSize: 20,
+    fontWeight: '600',
   },
   title: {
     fontSize: 28,
