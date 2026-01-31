@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -44,17 +46,15 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
   } = useTodaySession(date);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [bodyParts, setBodyParts] = useState<BodyPart[]>([]);
   const [exercisesByPart, setExercisesByPart] = useState<Exercise[]>([]);
-  const [customBodyPart, setCustomBodyPart] = useState('');
-  const [customExercise, setCustomExercise] = useState('');
+  const [newBodyPart, setNewBodyPart] = useState('');
+  const [newExercise, setNewExercise] = useState('');
 
   const pickerTextColor = colorScheme === 'dark' ? '#f5f5f5' : '#111';
   const pickerBackground = colorScheme === 'dark' ? '#1c1c1e' : '#fafafa';
   const pickerBorder = colorScheme === 'dark' ? '#2c2c2e' : '#ddd';
-
-  const CUSTOM_BODY_PART = '__custom_body_part__';
-  const CUSTOM_EXERCISE = '__custom_exercise__';
 
   const [bodyPartKey, setBodyPartKey] = useState('');
   const [exerciseKey, setExerciseKey] = useState('');
@@ -62,14 +62,14 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
   const loadBodyParts = useCallback(async () => {
     const parts = await listBodyParts();
     setBodyParts(parts);
-    const first = parts[0]?.name ?? CUSTOM_BODY_PART;
+    const first = parts[0]?.name ?? '';
     setBodyPartKey((current) => current || first);
   }, []);
 
   const loadExercises = useCallback(async (bodyPartName: string) => {
     const items = await listExercisesByBodyPart(bodyPartName);
     setExercisesByPart(items);
-    setExerciseKey(items[0]?.id ?? CUSTOM_EXERCISE);
+    setExerciseKey(items[0]?.id ?? '');
   }, []);
 
   useEffect(() => {
@@ -78,43 +78,36 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
 
   useEffect(() => {
     if (!bodyPartKey) {
-      return;
-    }
-    if (bodyPartKey === CUSTOM_BODY_PART) {
       setExercisesByPart([]);
-      setExerciseKey(CUSTOM_EXERCISE);
+      setExerciseKey('');
       return;
     }
     loadExercises(bodyPartKey).catch(() => undefined);
   }, [bodyPartKey, loadExercises]);
 
   const handleAddExercise = async () => {
-    const bodyPartName = bodyPartKey === CUSTOM_BODY_PART ? customBodyPart.trim() : bodyPartKey;
-    if (!bodyPartName) {
+    const exerciseName = exercisesByPart.find((exercise) => exercise.id === exerciseKey)?.name ?? '';
+    if (!exerciseName || !bodyPartKey) {
       return;
     }
+    await addExercise(exerciseName, bodyPartKey);
+    setIsAddOpen(false);
+  };
 
-    if (bodyPartKey === CUSTOM_BODY_PART) {
-      await ensureBodyPart(bodyPartName);
-      await loadBodyParts();
-      setBodyPartKey(bodyPartName);
-    }
-
-    let exerciseName = '';
-    if (bodyPartKey === CUSTOM_BODY_PART || exerciseKey === CUSTOM_EXERCISE) {
-      exerciseName = customExercise.trim();
-    } else {
-      exerciseName = exercisesByPart.find((exercise) => exercise.id === exerciseKey)?.name ?? '';
-    }
-
-    if (!exerciseName) {
+  const handleCreateExercise = async () => {
+    const bodyPartName = newBodyPart.trim();
+    const exerciseName = newExercise.trim();
+    if (!bodyPartName || !exerciseName) {
       return;
     }
-
-    await addExercise(exerciseName, bodyPartName || null);
+    await ensureBodyPart(bodyPartName);
+    await addExercise(exerciseName, bodyPartName);
+    await loadBodyParts();
+    setBodyPartKey(bodyPartName);
     await loadExercises(bodyPartName);
-    setCustomExercise('');
-    setCustomBodyPart('');
+    setNewBodyPart('');
+    setNewExercise('');
+    setIsCreateOpen(false);
     setIsAddOpen(false);
   };
 
@@ -129,12 +122,8 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
     ]);
   };
 
-  const isAddDisabled =
-    (bodyPartKey === CUSTOM_BODY_PART && !customBodyPart.trim()) ||
-    (bodyPartKey === CUSTOM_BODY_PART && !customExercise.trim()) ||
-    (bodyPartKey !== CUSTOM_BODY_PART &&
-      exerciseKey === CUSTOM_EXERCISE &&
-      !customExercise.trim());
+  const isAddDisabled = !exerciseKey;
+  const isCreateDisabled = !newBodyPart.trim() || !newExercise.trim();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -179,7 +168,14 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Exercise</Text>
+              <Pressable
+                style={styles.modalGhost}
+                onPress={() => {
+                  setIsAddOpen(false);
+                  setIsCreateOpen(true);
+                }}>
+                <Text style={styles.modalGhostText}>新規種目追加</Text>
+              </Pressable>
               <Pressable style={styles.modalClose} onPress={() => setIsAddOpen(false)}>
                 <Text style={styles.modalCloseText}>Close</Text>
               </Pressable>
@@ -196,60 +192,23 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
                 {bodyParts.map((part) => (
                   <Picker.Item key={part.id} label={part.name} value={part.name} color={pickerTextColor} />
                 ))}
-                <Picker.Item key="__custom__" label="＋ 新しい部位" value={CUSTOM_BODY_PART} color={pickerTextColor} />
               </Picker>
             </View>
 
-            {bodyPartKey === CUSTOM_BODY_PART ? (
-              <>
-                <Text style={styles.inputLabel}>New Body Part</Text>
-                <TextInput
-                  value={customBodyPart}
-                  onChangeText={setCustomBodyPart}
-                  placeholder="部位名を入力"
-                  style={[styles.textInput, { color: pickerTextColor, borderColor: pickerBorder }]}
-                  placeholderTextColor={pickerTextColor}
-                />
-                <Text style={styles.inputLabel}>New Exercise</Text>
-                <TextInput
-                  value={customExercise}
-                  onChangeText={setCustomExercise}
-                  placeholder="種目名を入力"
-                  style={[styles.textInput, { color: pickerTextColor, borderColor: pickerBorder }]}
-                  placeholderTextColor={pickerTextColor}
-                />
-              </>
-            ) : (
-              <>
-                <Text style={styles.inputLabel}>Exercise</Text>
-                <View style={[styles.pickerWrapper, { backgroundColor: pickerBackground, borderColor: pickerBorder }]}>
-                  <Picker
-                    selectedValue={exerciseKey}
-                    onValueChange={(value) => setExerciseKey(String(value))}
-                    enabled={exercisesByPart.length > 0}
-                    style={[styles.picker, { color: pickerTextColor }]}
-                    itemStyle={[styles.pickerItem, { color: pickerTextColor }]}
-                    dropdownIconColor={pickerTextColor}>
-                    {exercisesByPart.map((exercise) => (
-                      <Picker.Item key={exercise.id} label={exercise.name} value={exercise.id} color={pickerTextColor} />
-                    ))}
-                    <Picker.Item key="__custom__" label="＋ 新しい種目" value={CUSTOM_EXERCISE} color={pickerTextColor} />
-                  </Picker>
-                </View>
-                {exerciseKey === CUSTOM_EXERCISE ? (
-                  <>
-                    <Text style={styles.inputLabel}>New Exercise</Text>
-                    <TextInput
-                      value={customExercise}
-                      onChangeText={setCustomExercise}
-                      placeholder="種目名を入力"
-                      style={[styles.textInput, { color: pickerTextColor, borderColor: pickerBorder }]}
-                      placeholderTextColor={pickerTextColor}
-                    />
-                  </>
-                ) : null}
-              </>
-            )}
+            <Text style={styles.inputLabel}>Exercise</Text>
+            <View style={[styles.pickerWrapper, { backgroundColor: pickerBackground, borderColor: pickerBorder }]}>
+              <Picker
+                selectedValue={exerciseKey}
+                onValueChange={(value) => setExerciseKey(String(value))}
+                enabled={exercisesByPart.length > 0}
+                style={[styles.picker, { color: pickerTextColor }]}
+                itemStyle={[styles.pickerItem, { color: pickerTextColor }]}
+                dropdownIconColor={pickerTextColor}>
+                {exercisesByPart.map((exercise) => (
+                  <Picker.Item key={exercise.id} label={exercise.name} value={exercise.id} color={pickerTextColor} />
+                ))}
+              </Picker>
+            </View>
 
             <Pressable
               style={[styles.addButton, isAddDisabled && styles.addButtonDisabled]}
@@ -258,6 +217,48 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
               <Text style={styles.addButtonText}>Add</Text>
             </Pressable>
           </View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={isCreateOpen} animationType="slide" onRequestClose={() => setIsCreateOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <KeyboardAvoidingView
+            style={styles.keyboardAvoid}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>新規種目追加</Text>
+              <Pressable style={styles.modalClose} onPress={() => setIsCreateOpen(false)}>
+                <Text style={styles.modalCloseText}>Close</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.inputLabel}>Body Part</Text>
+            <TextInput
+              value={newBodyPart}
+              onChangeText={setNewBodyPart}
+              placeholder="部位名を入力"
+              style={[styles.textInput, { color: pickerTextColor, borderColor: pickerBorder }]}
+              placeholderTextColor={pickerTextColor}
+            />
+
+            <Text style={styles.inputLabel}>Exercise</Text>
+            <TextInput
+              value={newExercise}
+              onChangeText={setNewExercise}
+              placeholder="種目名を入力"
+              style={[styles.textInput, { color: pickerTextColor, borderColor: pickerBorder }]}
+              placeholderTextColor={pickerTextColor}
+            />
+
+            <Pressable
+              style={[styles.addButton, isCreateDisabled && styles.addButtonDisabled]}
+              onPress={handleCreateExercise}
+              disabled={isCreateDisabled}>
+              <Text style={styles.addButtonText}>Add</Text>
+            </Pressable>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -343,6 +344,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
     justifyContent: 'flex-end',
   },
+  keyboardAvoid: {
+    justifyContent: 'flex-end',
+  },
   modalCard: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 18,
@@ -367,6 +371,17 @@ const styles = StyleSheet.create({
     borderColor: '#111',
   },
   modalCloseText: {
+    fontWeight: '600',
+  },
+  modalGhost: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#111',
+    backgroundColor: '#fff',
+  },
+  modalGhostText: {
     fontWeight: '600',
   },
   undoButton: {
