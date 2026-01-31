@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SetRecord, WeightUnit } from '@/src/models/types';
 import { fromDisplayWeight, getWeightStep, toDisplayWeight } from '@/src/models/units';
 import { NumberStepper } from '@/src/ui/NumberStepper';
@@ -13,6 +15,8 @@ type Props = {
 };
 
 export function SetChip({ index, set, unit, onUpdate }: Props) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const [weightDisplay, setWeightDisplay] = useState(toDisplayWeight(set.weight, unit));
   const [reps, setReps] = useState(set.reps);
 
@@ -35,8 +39,8 @@ export function SetChip({ index, set, unit, onUpdate }: Props) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.setLabel}>Set {index + 1}</Text>
+    <View style={[styles.container, { backgroundColor: colors.chip }]}> 
+      <Text style={[styles.setLabel, { color: colors.subtleText }]}>Set {index + 1}</Text>
       <NumberStepper
         label={`Weight (${unit})`}
         value={weightDisplay}
@@ -53,13 +57,11 @@ const styles = StyleSheet.create({
   container: {
     padding: 10,
     borderRadius: 12,
-    backgroundColor: '#f7f7f7',
     marginBottom: 8,
     gap: 8,
   },
   setLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#333',
   },
 });

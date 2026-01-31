@@ -11,6 +11,8 @@ import {
 import { Calendar } from 'react-native-calendars';
 import { useRouter } from 'expo-router';
 
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { formatDateLocal } from '@/src/models/dates';
 import { SessionDateSummary, SessionDetail } from '@/src/models/types';
 import { toDisplayWeight } from '@/src/models/units';
@@ -28,6 +30,8 @@ function getMonthRange(year: number, month: number) {
 
 export default function HistoryScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const { unit } = useUnitPreference();
   const today = formatDateLocal(new Date());
   const [selectedDate, setSelectedDate] = useState(today);
@@ -78,22 +82,22 @@ export default function HistoryScreen() {
   const markedDates = useMemo(() => {
     const marked: Record<string, { marked?: boolean; dotColor?: string; selected?: boolean; selectedColor?: string }> = {};
     for (const key of Object.keys(summaries)) {
-      marked[key] = { marked: true, dotColor: '#111' };
+      marked[key] = { marked: true, dotColor: colors.primary };
     }
     marked[selectedDate] = {
       ...(marked[selectedDate] ?? {}),
       selected: true,
-      selectedColor: '#111',
+      selectedColor: colors.primary,
     };
     return marked;
-  }, [summaries, selectedDate]);
+  }, [summaries, selectedDate, colors.primary]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>History</Text>
+        <Text style={[styles.title, { color: colors.text }]}>History</Text>
 
-        <View style={styles.calendarCard}>
+        <View style={[styles.calendarCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <Calendar
             current={selectedDate}
             onDayPress={(day) => {
@@ -102,9 +106,12 @@ export default function HistoryScreen() {
             onMonthChange={(day) => loadMonth(day.year, day.month)}
             markedDates={markedDates}
             theme={{
-              todayTextColor: '#111',
-              arrowColor: '#111',
-              monthTextColor: '#111',
+              calendarBackground: colors.card,
+              todayTextColor: colors.text,
+              dayTextColor: colors.text,
+              arrowColor: colors.text,
+              monthTextColor: colors.text,
+              textSectionTitleColor: colors.mutedText,
               textDayFontWeight: '600',
               textMonthFontWeight: '700',
               textDayHeaderFontWeight: '600',
@@ -114,29 +121,30 @@ export default function HistoryScreen() {
 
         {loading ? <ActivityIndicator /> : null}
 
-        <View style={styles.detailCard}>
+        <View style={[styles.detailCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <View style={styles.detailHeader}>
-            <Text style={styles.detailTitle}>トレーニング内容</Text>
-            <Pressable style={styles.editButton} onPress={() => router.push(`/history/${selectedDate}/edit`)}>
-              <Text style={styles.editButtonText}>Edit</Text>
+            <Text style={[styles.detailTitle, { color: colors.text }]}>トレーニング内容</Text>
+            <Pressable
+              style={[styles.editButton, { borderColor: colors.primary }]}
+              onPress={() => router.push(`/history/${selectedDate}/edit`)}>
+              <Text style={[styles.editButtonText, { color: colors.text }]}>Edit</Text>
             </Pressable>
           </View>
           {detailLoading ? (
             <ActivityIndicator />
           ) : detail ? (
             detail.items.length === 0 ? (
-              <Text style={styles.empty}>トレーニング履歴がありません。</Text>
+              <Text style={[styles.empty, { color: colors.mutedText }]}>トレーニング履歴がありません。</Text>
             ) : (
               detail.items.map((item) => (
-                <View key={item.exercise.id} style={styles.detailSection}>
-                  <Text style={styles.detailSectionTitle}>{item.exercise.name}</Text>
+                <View key={item.exercise.id} style={[styles.detailSection, { backgroundColor: colors.chip }]}>
+                  <Text style={[styles.detailSectionTitle, { color: colors.text }]}>{item.exercise.name}</Text>
                   {item.sets.length === 0 ? (
-                    <Text style={styles.detailText}>セット記録がありません。</Text>
+                    <Text style={[styles.detailText, { color: colors.mutedText }]}>セット記録がありません。</Text>
                   ) : (
                     item.sets.map((set, index) => (
-                      <Text key={set.id} style={styles.detailText}>
-                        Set {index + 1}: {toDisplayWeight(set.weight, unit)}
-                        {unit} × {set.reps}
+                      <Text key={set.id} style={[styles.detailText, { color: colors.subtleText }]}>
+                        Set {index + 1}: {toDisplayWeight(set.weight, unit)}{unit} × {set.reps}
                       </Text>
                     ))
                   )}
@@ -144,7 +152,7 @@ export default function HistoryScreen() {
               ))
             )
           ) : (
-            <Text style={styles.empty}>トレーニング履歴がありません。</Text>
+            <Text style={[styles.empty, { color: colors.mutedText }]}>トレーニング履歴がありません。</Text>
           )}
         </View>
       </ScrollView>
@@ -155,7 +163,6 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fafafa',
   },
   container: {
     padding: 16,
@@ -166,17 +173,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   calendarCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#eee',
     padding: 12,
   },
   detailCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#eee',
     padding: 16,
     gap: 12,
   },
@@ -195,14 +198,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#111',
   },
   editButtonText: {
     fontWeight: '600',
   },
   detailSection: {
     borderRadius: 12,
-    backgroundColor: '#f7f7f7',
     padding: 12,
     gap: 6,
   },
@@ -212,9 +213,8 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 12,
-    color: '#444',
   },
   empty: {
-    color: '#666',
+    fontSize: 12,
   },
 });

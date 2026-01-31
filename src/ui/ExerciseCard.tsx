@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ExerciseWithSets, WeightUnit } from '@/src/models/types';
 import { toDisplayWeight } from '@/src/models/units';
 import { SetChip } from '@/src/ui/SetChip';
@@ -14,20 +16,24 @@ type Props = {
 };
 
 export function ExerciseCard({ item, unit, onAddSet, onUpdateSet, onPress, onDelete }: Props) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const lastSet = item.lastSet;
   const lastText = lastSet
     ? `${toDisplayWeight(lastSet.weight, unit)}${unit} x ${lastSet.reps}`
     : 'No previous set';
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.headerRow}>
         <Pressable onPress={() => onPress(item.exercise.id)} style={styles.headerText}>
-          <Text style={styles.title}>{item.exercise.name}</Text>
-          <Text style={styles.subtitle}>Previous: {lastText}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{item.exercise.name}</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedText }]}>Previous: {lastText}</Text>
         </Pressable>
-        <Pressable style={styles.deleteButton} onPress={() => onDelete(item.exercise.id)}>
-          <Text style={styles.deleteText}>Delete</Text>
+        <Pressable
+          style={[styles.deleteButton, { borderColor: colors.dangerBorder, backgroundColor: colors.dangerBackground }]}
+          onPress={() => onDelete(item.exercise.id)}>
+          <Text style={[styles.deleteText, { color: colors.dangerText }]}>Delete</Text>
         </Pressable>
       </View>
       <View style={styles.sets}>
@@ -35,8 +41,8 @@ export function ExerciseCard({ item, unit, onAddSet, onUpdateSet, onPress, onDel
           <SetChip key={set.id} index={index} set={set} unit={unit} onUpdate={onUpdateSet} />
         ))}
       </View>
-      <Pressable style={styles.addButton} onPress={() => onAddSet(item.exercise.id)}>
-        <Text style={styles.addButtonText}>+ Add set</Text>
+      <Pressable style={[styles.addButton, { backgroundColor: colors.primary }]} onPress={() => onAddSet(item.exercise.id)}>
+        <Text style={[styles.addButtonText, { color: colors.primaryText }]}>+ Add set</Text>
       </Pressable>
     </View>
   );
@@ -44,11 +50,9 @@ export function ExerciseCard({ item, unit, onAddSet, onUpdateSet, onPress, onDel
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
     marginBottom: 16,
     gap: 12,
   },
@@ -68,18 +72,14 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 12,
-    color: '#666',
   },
   deleteButton: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#f2b5b5',
-    backgroundColor: '#fff5f5',
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   deleteText: {
-    color: '#b42318',
     fontWeight: '600',
     fontSize: 12,
   },
@@ -91,10 +91,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#111',
   },
   addButtonText: {
-    color: '#fff',
     fontWeight: '600',
   },
 });

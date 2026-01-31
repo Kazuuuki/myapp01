@@ -11,12 +11,18 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { deleteAll } from '@/src/repo/workoutRepo';
+import { useThemePreference } from '@/src/state/themePreference';
 import { useUnitPreference } from '@/src/state/unitPreference';
 import { exportAllToJson, exportSetsToCsv } from '@/src/usecases/export';
 
 export default function SettingsScreen() {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const { unit, setUnit } = useUnitPreference();
+  const { preference, setPreference } = useThemePreference();
   const [exporting, setExporting] = useState(false);
   const version = Constants.expoConfig?.version ?? '0.0.0';
   const buildNumber =
@@ -63,61 +69,141 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Settings</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Unit</Text>
-          <View style={styles.segment}>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>Unit</Text>
+          <View style={[styles.segment, { borderColor: colors.inputBorder }]}>
             <Pressable
-              style={[styles.segmentButton, unit === 'kg' && styles.segmentActive]}
+              style={[
+                styles.segmentButton,
+                { backgroundColor: colors.card },
+                unit === 'kg' && { backgroundColor: colors.primary },
+              ]}
               onPress={() => setUnit('kg')}>
-              <Text style={[styles.segmentText, unit === 'kg' && styles.segmentTextActive]}>kg</Text>
+              <Text
+                style={[
+                  styles.segmentText,
+                  { color: colors.text },
+                  unit === 'kg' && { color: colors.primaryText },
+                ]}>
+                kg
+              </Text>
             </Pressable>
             <Pressable
-              style={[styles.segmentButton, unit === 'lb' && styles.segmentActive]}
+              style={[
+                styles.segmentButton,
+                { backgroundColor: colors.card },
+                unit === 'lb' && { backgroundColor: colors.primary },
+              ]}
               onPress={() => setUnit('lb')}>
-              <Text style={[styles.segmentText, unit === 'lb' && styles.segmentTextActive]}>lb</Text>
+              <Text
+                style={[
+                  styles.segmentText,
+                  { color: colors.text },
+                  unit === 'lb' && { color: colors.primaryText },
+                ]}>
+                lb
+              </Text>
             </Pressable>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Export</Text>
-          <Pressable style={styles.actionButton} onPress={handleExportJson} disabled={exporting}>
-            <Text style={styles.actionText}>Export JSON</Text>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>Export</Text>
+          <Pressable
+            style={[styles.actionButton, { borderColor: colors.inputBorder }]}
+            onPress={handleExportJson}
+            disabled={exporting}>
+            <Text style={[styles.actionText, { color: colors.text }]}>Export JSON</Text>
           </Pressable>
-          <Pressable style={styles.actionButton} onPress={handleExportCsv} disabled={exporting}>
-            <Text style={styles.actionText}>Export CSV</Text>
+          <Pressable
+            style={[styles.actionButton, { borderColor: colors.inputBorder }]}
+            onPress={handleExportCsv}
+            disabled={exporting}>
+            <Text style={[styles.actionText, { color: colors.text }]}>Export CSV</Text>
           </Pressable>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Appearance</Text>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Theme</Text>
-            <Text style={styles.rowValue}>Auto (System)</Text>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>Appearance</Text>
+          <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Theme</Text>
+          <View style={[styles.segment, { borderColor: colors.inputBorder }]}>
+            <Pressable
+              style={[
+                styles.segmentButton,
+                { backgroundColor: colors.card },
+                preference === 'system' && { backgroundColor: colors.primary },
+              ]}
+              onPress={() => setPreference('system')}>
+              <Text
+                style={[
+                  styles.segmentText,
+                  { color: colors.text },
+                  preference === 'system' && { color: colors.primaryText },
+                ]}>
+                Auto
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.segmentButton,
+                { backgroundColor: colors.card },
+                preference === 'light' && { backgroundColor: colors.primary },
+              ]}
+              onPress={() => setPreference('light')}>
+              <Text
+                style={[
+                  styles.segmentText,
+                  { color: colors.text },
+                  preference === 'light' && { color: colors.primaryText },
+                ]}>
+                Light
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.segmentButton,
+                { backgroundColor: colors.card },
+                preference === 'dark' && { backgroundColor: colors.primary },
+              ]}
+              onPress={() => setPreference('dark')}>
+              <Text
+                style={[
+                  styles.segmentText,
+                  { color: colors.text },
+                  preference === 'dark' && { color: colors.primaryText },
+                ]}>
+                Dark
+              </Text>
+            </Pressable>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>About</Text>
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Version</Text>
-            <Text style={styles.rowValue}>
+            <Text style={[styles.rowLabel, { color: colors.text }]}>Version</Text>
+            <Text style={[styles.rowValue, { color: colors.mutedText }]}>
               {version} ({buildNumber})
             </Text>
           </View>
-          <Pressable style={styles.actionButton} onPress={handleFeedback}>
-            <Text style={styles.actionText}>Send Feedback</Text>
+          <Pressable style={[styles.actionButton, { borderColor: colors.inputBorder }]} onPress={handleFeedback}>
+            <Text style={[styles.actionText, { color: colors.text }]}>Send Feedback</Text>
           </Pressable>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Danger Zone</Text>
-          <Pressable style={[styles.actionButton, styles.dangerButton]} onPress={handleDeleteAll}>
-            <Text style={[styles.actionText, styles.dangerText]}>Delete All Data</Text>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>Danger Zone</Text>
+          <Pressable
+            style={[
+              styles.actionButton,
+              { borderColor: colors.dangerBorder, backgroundColor: colors.dangerBackground },
+            ]}
+            onPress={handleDeleteAll}>
+            <Text style={[styles.actionText, { color: colors.dangerText }]}>Delete All Data</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -128,7 +214,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fafafa',
   },
   container: {
     padding: 16,
@@ -139,22 +224,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   section: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#eee',
     gap: 12,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#444',
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   segment: {
     flexDirection: 'row',
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -162,24 +247,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  segmentActive: {
-    backgroundColor: '#111',
   },
   segmentText: {
     fontWeight: '600',
-    color: '#111',
-  },
-  segmentTextActive: {
-    color: '#fff',
   },
   actionButton: {
     paddingVertical: 12,
     alignItems: 'center',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#ddd',
   },
   actionText: {
     fontWeight: '600',
@@ -191,16 +267,8 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontWeight: '600',
-    color: '#333',
   },
   rowValue: {
-    color: '#666',
-  },
-  dangerButton: {
-    borderColor: '#f2b5b5',
-    backgroundColor: '#fff5f5',
-  },
-  dangerText: {
-    color: '#b42318',
+    fontSize: 12,
   },
 });

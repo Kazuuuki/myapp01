@@ -1,5 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+
 type Props = {
   label: string;
   value: number;
@@ -9,6 +12,9 @@ type Props = {
 };
 
 export function NumberStepper({ label, value, step, min = 0, onChange }: Props) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
+
   const decrement = () => {
     const next = Math.max(min, value - step);
     onChange(Number(next.toFixed(2)));
@@ -21,14 +27,14 @@ export function NumberStepper({ label, value, step, min = 0, onChange }: Props) 
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: colors.mutedText }]}>{label}</Text>
       <View style={styles.controls}>
-        <Pressable style={styles.button} onPress={decrement}>
-          <Text style={styles.buttonText}>-</Text>
+        <Pressable style={[styles.button, { backgroundColor: colors.secondary }]} onPress={decrement}>
+          <Text style={[styles.buttonText, { color: colors.text }]}>-</Text>
         </Pressable>
-        <Text style={styles.value}>{value}</Text>
-        <Pressable style={styles.button} onPress={increment}>
-          <Text style={styles.buttonText}>+</Text>
+        <Text style={[styles.value, { color: colors.text }]}>{value}</Text>
+        <Pressable style={[styles.button, { backgroundColor: colors.secondary }]} onPress={increment}>
+          <Text style={[styles.buttonText, { color: colors.text }]}>+</Text>
         </Pressable>
       </View>
     </View>
@@ -44,7 +50,6 @@ const styles = StyleSheet.create({
   label: {
     minWidth: 40,
     fontSize: 12,
-    color: '#666',
   },
   controls: {
     flexDirection: 'row',
@@ -55,7 +60,6 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#e6e6e6',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -16,6 +16,7 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
 
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { BodyPart, Exercise } from '@/src/models/types';
 import { useTodaySession } from '@/src/state/todaySession';
@@ -31,8 +32,9 @@ type Props = {
 
 export function SessionDayScreen({ date, title, subtitle }: Props) {
   const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const { unit } = useUnitPreference();
-  const colorScheme = useColorScheme();
   const {
     exercises,
     loading,
@@ -52,9 +54,9 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
   const [newBodyPart, setNewBodyPart] = useState('');
   const [newExercise, setNewExercise] = useState('');
 
-  const pickerTextColor = colorScheme === 'dark' ? '#f5f5f5' : '#111';
-  const pickerBackground = colorScheme === 'dark' ? '#1c1c1e' : '#fafafa';
-  const pickerBorder = colorScheme === 'dark' ? '#2c2c2e' : '#ddd';
+  const pickerTextColor = colorScheme === 'dark' ? colors.text : colors.text;
+  const pickerBackground = colors.inputBackground;
+  const pickerBorder = colors.inputBorder;
 
   const [bodyPartKey, setBodyPartKey] = useState('');
   const [exerciseKey, setExerciseKey] = useState('');
@@ -126,29 +128,29 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
   const isCreateDisabled = !newBodyPart.trim() || !newExercise.trim();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>{subtitle ?? date}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+            <Text style={[styles.subtitle, { color: colors.mutedText }]}>{subtitle ?? date}</Text>
           </View>
           {undoAvailable ? (
-            <Pressable style={styles.undoButton} onPress={undo}>
-              <Text style={styles.undoText}>Undo</Text>
+            <Pressable style={[styles.undoButton, { borderColor: colors.primary }]} onPress={undo}>
+              <Text style={[styles.undoText, { color: colors.text }]}>Undo</Text>
             </Pressable>
           ) : null}
         </View>
 
-        <Pressable style={styles.addTrigger} onPress={() => setIsAddOpen(true)}>
-          <Text style={styles.addTriggerText}>Add Exercise</Text>
+        <Pressable style={[styles.addTrigger, { backgroundColor: colors.primary }]} onPress={() => setIsAddOpen(true)}>
+          <Text style={[styles.addTriggerText, { color: colors.primaryText }]}>Add Exercise</Text>
         </Pressable>
 
         {loading ? <ActivityIndicator /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={[styles.error, { color: colors.dangerText }]}>{error}</Text> : null}
 
         {exercises.length === 0 && !loading ? (
-          <Text style={styles.empty}>No exercises yet. Add one to start.</Text>
+          <Text style={[styles.empty, { color: colors.mutedText }]}>No exercises yet. Add one to start.</Text>
         ) : null}
 
         {exercises.map((item) => (
@@ -165,23 +167,23 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
       </ScrollView>
 
       <Modal transparent visible={isAddOpen} animationType="slide" onRequestClose={() => setIsAddOpen(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+        <View style={[styles.modalBackdrop, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.modalCard, { backgroundColor: colors.card }]}> 
             <View style={styles.modalHeader}>
               <Pressable
-                style={styles.modalGhost}
+                style={[styles.modalGhost, { borderColor: colors.primary }]}
                 onPress={() => {
                   setIsAddOpen(false);
                   setIsCreateOpen(true);
                 }}>
-                <Text style={styles.modalGhostText}>新規種目追加</Text>
+                <Text style={[styles.modalGhostText, { color: colors.text }]}>新規種目追加</Text>
               </Pressable>
-              <Pressable style={styles.modalClose} onPress={() => setIsAddOpen(false)}>
-                <Text style={styles.modalCloseText}>Close</Text>
+              <Pressable style={[styles.modalClose, { borderColor: colors.primary }]} onPress={() => setIsAddOpen(false)}>
+                <Text style={[styles.modalCloseText, { color: colors.text }]}>Close</Text>
               </Pressable>
             </View>
 
-            <Text style={styles.inputLabel}>Body Part</Text>
+            <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Body Part</Text>
             <View style={[styles.pickerWrapper, { backgroundColor: pickerBackground, borderColor: pickerBorder }]}>
               <Picker
                 selectedValue={bodyPartKey}
@@ -195,7 +197,7 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
               </Picker>
             </View>
 
-            <Text style={styles.inputLabel}>Exercise</Text>
+            <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Exercise</Text>
             <View style={[styles.pickerWrapper, { backgroundColor: pickerBackground, borderColor: pickerBorder }]}>
               <Picker
                 selectedValue={exerciseKey}
@@ -211,52 +213,52 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
             </View>
 
             <Pressable
-              style={[styles.addButton, isAddDisabled && styles.addButtonDisabled]}
+              style={[styles.addButton, { backgroundColor: colors.primary }, isAddDisabled && { backgroundColor: colors.disabled }]}
               onPress={handleAddExercise}
               disabled={isAddDisabled}>
-              <Text style={styles.addButtonText}>Add</Text>
+              <Text style={[styles.addButtonText, { color: colors.primaryText }]}>Add</Text>
             </Pressable>
           </View>
         </View>
       </Modal>
 
       <Modal transparent visible={isCreateOpen} animationType="slide" onRequestClose={() => setIsCreateOpen(false)}>
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, { backgroundColor: colors.overlay }]}>
           <KeyboardAvoidingView
             style={styles.keyboardAvoid}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-            <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>新規種目追加</Text>
-              <Pressable style={styles.modalClose} onPress={() => setIsCreateOpen(false)}>
-                <Text style={styles.modalCloseText}>Close</Text>
+            <View style={[styles.modalCard, { backgroundColor: colors.card }]}> 
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>新規種目追加</Text>
+                <Pressable style={[styles.modalClose, { borderColor: colors.primary }]} onPress={() => setIsCreateOpen(false)}>
+                  <Text style={[styles.modalCloseText, { color: colors.text }]}>Close</Text>
+                </Pressable>
+              </View>
+
+              <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Body Part</Text>
+              <TextInput
+                value={newBodyPart}
+                onChangeText={setNewBodyPart}
+                placeholder="部位名を入力"
+                style={[styles.textInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+                placeholderTextColor={colors.mutedText}
+              />
+
+              <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Exercise</Text>
+              <TextInput
+                value={newExercise}
+                onChangeText={setNewExercise}
+                placeholder="種目名を入力"
+                style={[styles.textInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+                placeholderTextColor={colors.mutedText}
+              />
+
+              <Pressable
+                style={[styles.addButton, { backgroundColor: colors.primary }, isCreateDisabled && { backgroundColor: colors.disabled }]}
+                onPress={handleCreateExercise}
+                disabled={isCreateDisabled}>
+                <Text style={[styles.addButtonText, { color: colors.primaryText }]}>Add</Text>
               </Pressable>
-            </View>
-
-            <Text style={styles.inputLabel}>Body Part</Text>
-            <TextInput
-              value={newBodyPart}
-              onChangeText={setNewBodyPart}
-              placeholder="部位名を入力"
-              style={[styles.textInput, { color: pickerTextColor, borderColor: pickerBorder }]}
-              placeholderTextColor={pickerTextColor}
-            />
-
-            <Text style={styles.inputLabel}>Exercise</Text>
-            <TextInput
-              value={newExercise}
-              onChangeText={setNewExercise}
-              placeholder="種目名を入力"
-              style={[styles.textInput, { color: pickerTextColor, borderColor: pickerBorder }]}
-              placeholderTextColor={pickerTextColor}
-            />
-
-            <Pressable
-              style={[styles.addButton, isCreateDisabled && styles.addButtonDisabled]}
-              onPress={handleCreateExercise}
-              disabled={isCreateDisabled}>
-              <Text style={styles.addButtonText}>Add</Text>
-            </Pressable>
             </View>
           </KeyboardAvoidingView>
         </View>
@@ -268,7 +270,6 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fafafa',
   },
   container: {
     padding: 16,
@@ -285,30 +286,24 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 12,
-    color: '#666',
   },
   addTrigger: {
-    backgroundColor: '#111',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addTriggerText: {
-    color: '#fff',
     fontWeight: '600',
   },
   inputLabel: {
     fontSize: 12,
-    color: '#666',
     fontWeight: '600',
   },
   pickerWrapper: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#fafafa',
     height: 130,
   },
   picker: {
@@ -323,32 +318,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#fafafa',
   },
   addButton: {
-    backgroundColor: '#111',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addButtonDisabled: {
-    backgroundColor: '#999',
-  },
   addButtonText: {
-    color: '#fff',
     fontWeight: '600',
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-    justifyContent: 'flex-end',
-  },
-  keyboardAvoid: {
     justifyContent: 'flex-end',
   },
   modalCard: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     padding: 16,
@@ -368,7 +352,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#111',
   },
   modalCloseText: {
     fontWeight: '600',
@@ -378,8 +361,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#111',
-    backgroundColor: '#fff',
   },
   modalGhostText: {
     fontWeight: '600',
@@ -389,15 +370,17 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#111',
   },
   undoText: {
     fontWeight: '600',
   },
+  keyboardAvoid: {
+    justifyContent: 'flex-end',
+  },
   empty: {
-    color: '#666',
+    fontSize: 12,
   },
   error: {
-    color: '#d64545',
+    fontSize: 12,
   },
 });

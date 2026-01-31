@@ -4,16 +4,15 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ensureDbReady } from '@/src/db/client';
+import { ThemePreferenceProvider, useAppColorScheme } from '@/src/state/themePreference';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
+function RootLayoutContent() {
+  const colorScheme = useAppColorScheme();
   useEffect(() => {
     ensureDbReady().catch((error) => {
       console.warn('Failed to initialize database', error);
@@ -28,5 +27,13 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemePreferenceProvider>
+      <RootLayoutContent />
+    </ThemePreferenceProvider>
   );
 }

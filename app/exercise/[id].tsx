@@ -1,55 +1,46 @@
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ExerciseSummary } from '@/src/models/types';
 import { toDisplayWeight } from '@/src/models/units';
 import { useUnitPreference } from '@/src/state/unitPreference';
 import { getExerciseSummary } from '@/src/usecases/exerciseDetail';
-import { updateExerciseMemo } from '@/src/repo/exerciseRepo';
 
 export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const { unit } = useUnitPreference();
   const [summary, setSummary] = useState<ExerciseSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [memo, setMemo] = useState('');
 
   useEffect(() => {
+    let mounted = true;
     if (!id) {
       return;
     }
-    let mounted = true;
-    getExerciseSummary(String(id)).then((data) => {
-      if (mounted) {
-        setSummary(data);
-        setMemo(data?.exercise.memo ?? '');
-        setLoading(false);
-      }
-    });
+    getExerciseSummary(String(id))
+      .then((data) => {
+        if (mounted) {
+          setSummary(data);
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
     return () => {
       mounted = false;
     };
   }, [id]);
 
-  const handleMemoChange = async (text: string) => {
-    setMemo(text);
-    if (id) {
-      await updateExerciseMemo(String(id), text.length ? text : null);
-    }
-  };
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
         <ActivityIndicator style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
@@ -57,48 +48,50 @@ export default function ExerciseDetailScreen() {
 
   if (!summary) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <Text style={styles.error}>Exercise not found.</Text>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.error, { color: colors.dangerText }]}>Exercise not found.</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>{summary.exercise.name}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{summary.exercise.name}</Text>
+        <Text style={[styles.bodyPart, { color: colors.mutedText }]}>Body part: {summary.exercise.bodyPart ?? '-'}</Text>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Memo</Text>
-          <TextInput
-            value={memo}
-            onChangeText={handleMemoChange}
-            style={styles.memoInput}
-            placeholder="Add notes"
-            multiline
-          />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Stats</Text>
-          <Text style={styles.statText}>Best Volume: {summary.bestVolume ?? '--'}</Text>
-          <Text style={styles.statText}>
-            Max Weight: {summary.maxWeight ? `${toDisplayWeight(summary.maxWeight, unit)} ${unit}` : '--'}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Best Volume</Text>
+          <Text style={[styles.cardValue, { color: colors.subtleText }]}>
+            {summary.bestVolume ? `${summary.bestVolume.toFixed(1)} ${unit} x reps` : '-'}
           </Text>
-          <Text style={styles.statText}>Max Reps: {summary.maxReps ?? '--'}</Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Sets</Text>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Max Weight</Text>
+          <Text style={[styles.cardValue, { color: colors.subtleText }]}>
+            {summary.maxWeight ? `${toDisplayWeight(summary.maxWeight, unit)} ${unit}` : '-'}
+          </Text>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Max Reps</Text>
+          <Text style={[styles.cardValue, { color: colors.subtleText }]}> {summary.maxReps ?? '-'} </Text>
+        </View>
+
+        <View style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.historyTitle, { color: colors.text }]}>Recent Sets</Text>
           {summary.recent.length === 0 ? (
-            <Text style={styles.empty}>No history yet.</Text>
+            <Text style={[styles.empty, { color: colors.mutedText }]}>No history yet.</Text>
           ) : (
             summary.recent.map((item) => (
-              <View key={item.set.id} style={styles.historyRow}>
-                <Text style={styles.historyDate}>{item.sessionDate}</Text>
-                <Text style={styles.historyValue}>
-                  {toDisplayWeight(item.set.weight, unit)} {unit} x {item.set.reps}
-                </Text>
+              <View key={item.set.id} style={[styles.historyRow, { borderColor: colors.inputBorder }]}>
+                <View>
+                  <Text style={[styles.historyDate, { color: colors.subtleText }]}>{item.sessionDate}</Text>
+                  <Text style={[styles.historyValue, { color: colors.text }]}>
+                    {toDisplayWeight(item.set.weight, unit)}{unit} x {item.set.reps}
+                  </Text>
+                </View>
               </View>
             ))
           )}
@@ -111,59 +104,58 @@ export default function ExerciseDetailScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fafafa',
   },
   container: {
     padding: 16,
     gap: 16,
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '700',
   },
-  section: {
-    backgroundColor: '#fff',
+  bodyPart: {
+    fontSize: 12,
+  },
+  card: {
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#eee',
-    gap: 8,
   },
-  sectionTitle: {
+  cardTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  historyCard: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    gap: 12,
+  },
+  historyTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#444',
-  },
-  memoInput: {
-    minHeight: 80,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    padding: 12,
-    textAlignVertical: 'top',
-  },
-  statText: {
-    fontSize: 14,
   },
   historyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
   },
   historyDate: {
     fontSize: 12,
-    color: '#666',
   },
   historyValue: {
     fontSize: 14,
     fontWeight: '600',
   },
   empty: {
-    color: '#666',
+    fontSize: 12,
   },
   error: {
     marginTop: 40,
     textAlign: 'center',
-    color: '#d64545',
   },
 });
