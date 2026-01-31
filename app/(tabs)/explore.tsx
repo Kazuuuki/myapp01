@@ -85,8 +85,6 @@ export default function HistoryScreen() {
     return marked;
   }, [summaries, selectedDate]);
 
-  const selectedSummary = summaries[selectedDate];
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -112,17 +110,6 @@ export default function HistoryScreen() {
         </View>
 
         {loading ? <ActivityIndicator /> : null}
-
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>{selectedDate}</Text>
-          {selectedSummary ? (
-            <Text style={styles.summaryMeta}>
-              Exercises: {selectedSummary.exerciseCount} ・ Sets: {selectedSummary.setCount}
-            </Text>
-          ) : (
-            <Text style={styles.summaryMeta}>No session yet.</Text>
-          )}
-        </View>
 
         <View style={styles.detailCard}>
           <Text style={styles.detailTitle}>トレーニング内容</Text>
@@ -176,22 +163,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
     padding: 12,
-  },
-  summaryCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#eee',
-    padding: 16,
-    gap: 8,
-  },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  summaryMeta: {
-    fontSize: 12,
-    color: '#666',
   },
   detailCard: {
     backgroundColor: '#fff',
