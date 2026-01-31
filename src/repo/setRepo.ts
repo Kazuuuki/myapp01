@@ -37,6 +37,16 @@ export async function deleteSet(id: string): Promise<void> {
   await executeSql(`DELETE FROM set_records WHERE id = ?;`, [id]);
 }
 
+export async function deleteSetsBySessionAndExercise(
+  sessionId: string,
+  exerciseId: string,
+): Promise<void> {
+  await executeSql(`DELETE FROM set_records WHERE session_id = ? AND exercise_id = ?;`, [
+    sessionId,
+    exerciseId,
+  ]);
+}
+
 export async function restoreSet(setRecord: SetRecord): Promise<void> {
   await executeSql(
     `INSERT INTO set_records (id, session_id, exercise_id, weight, reps, created_at) VALUES (?, ?, ?, ?, ?, ?);`,
@@ -67,11 +77,37 @@ export async function getSetsBySession(sessionId: string): Promise<SetRecord[]> 
   );
 }
 
+export async function getSetsBySessionAndExercise(
+  sessionId: string,
+  exerciseId: string,
+): Promise<SetRecord[]> {
+  return queryAll<SetRecord>(
+    `SELECT id, session_id as sessionId, exercise_id as exerciseId, weight, reps, created_at as createdAt
+     FROM set_records WHERE session_id = ? AND exercise_id = ? ORDER BY created_at ASC;`,
+    [sessionId, exerciseId],
+  );
+}
+
 export async function getLastSetByExercise(exerciseId: string): Promise<SetRecord | null> {
   return queryFirst<SetRecord>(
     `SELECT id, session_id as sessionId, exercise_id as exerciseId, weight, reps, created_at as createdAt
      FROM set_records WHERE exercise_id = ? ORDER BY created_at DESC LIMIT 1;`,
     [exerciseId],
+  );
+}
+
+export async function getLastSessionByExerciseBeforeDate(
+  exerciseId: string,
+  beforeDate: string,
+): Promise<WorkoutSession | null> {
+  return queryFirst<WorkoutSession>(
+    `SELECT ws.id as id, ws.date as date, ws.start_time as startTime
+     FROM set_records sr
+     JOIN workout_sessions ws ON ws.id = sr.session_id
+     WHERE sr.exercise_id = ? AND ws.date < ?
+     ORDER BY ws.date DESC, ws.start_time DESC, sr.created_at DESC
+     LIMIT 1;`,
+    [exerciseId, beforeDate],
   );
 }
 

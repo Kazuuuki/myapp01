@@ -12,7 +12,18 @@ import {
   getExerciseByNameAndPart,
   updateExerciseBodyPart,
 } from '@/src/repo/exerciseRepo';
-import { addSet, deleteSet, getLastSetByExercise, getSetById, getSetsBySession, restoreSet, updateSet } from '@/src/repo/setRepo';
+import {
+  addSet,
+  deleteSet,
+  deleteSetsBySessionAndExercise,
+  getLastSessionByExerciseBeforeDate,
+  getLastSetByExercise,
+  getSetById,
+  getSetsBySession,
+  getSetsBySessionAndExercise,
+  restoreSet,
+  updateSet,
+} from '@/src/repo/setRepo';
 import { getLastAction, setLastAction } from '@/src/state/lastAction';
 
 export async function getOrCreateSessionByDate(date: string): Promise<WorkoutSession> {
@@ -60,7 +71,7 @@ export async function createExerciseAndAddToToday(
   return exercise;
 }
 
-export async function getTodayExercises(sessionId: string): Promise<ExerciseWithSets[]> {
+export async function getTodayExercises(sessionId: string, date: string): Promise<ExerciseWithSets[]> {
   const exercises = await getExercisesBySession(sessionId);
   const sets = await getSetsBySession(sessionId);
 
@@ -72,6 +83,8 @@ export async function getTodayExercises(sessionId: string): Promise<ExerciseWith
       position: entry.position,
       sets: [],
       lastSet: null,
+      lastSessionDate: null,
+      lastSessionSets: [],
     });
   }
 
@@ -84,6 +97,11 @@ export async function getTodayExercises(sessionId: string): Promise<ExerciseWith
 
   for (const item of grouped.values()) {
     item.lastSet = await getLastSetByExercise(item.exercise.id);
+    const lastSession = await getLastSessionByExerciseBeforeDate(item.exercise.id, date);
+    if (lastSession) {
+      item.lastSessionDate = lastSession.date;
+      item.lastSessionSets = await getSetsBySessionAndExercise(lastSession.id, item.exercise.id);
+    }
   }
 
   return Array.from(grouped.values()).sort((a, b) => a.position - b.position);
@@ -105,6 +123,35 @@ export async function updateSetQuick(setId: string, weight: number, reps: number
   }
   setLastAction({ type: 'update_set', setId, previousWeight: previous.weight, previousReps: previous.reps });
   await updateSet(setId, weight, reps);
+}
+
+export async function deleteSetQuick(setId: string) {
+  const previous = await getSetById(setId);
+  if (!previous) {
+    return;
+  }
+  setLastAction({ type: 'delete_set', set: previous });
+  await deleteSet(setId);
+}
+
+export async function pastePreviousSetsToSession(
+  sessionId: string,
+  exerciseId: string,
+  date: string,
+): Promise<boolean> {
+  const lastSession = await getLastSessionByExerciseBeforeDate(exerciseId, date);
+  if (!lastSession) {
+    return false;
+  }
+  const previousSets = await getSetsBySessionAndExercise(lastSession.id, exerciseId);
+  if (previousSets.length === 0) {
+    return false;
+  }
+  await deleteSetsBySessionAndExercise(sessionId, exerciseId);
+  for (const set of previousSets) {
+    await addSet(sessionId, exerciseId, set.weight, set.reps);
+  }
+  return true;
 }
 
 export async function undoLastAction() {

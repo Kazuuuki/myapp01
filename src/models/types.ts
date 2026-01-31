@@ -38,6 +38,8 @@ export type ExerciseWithSets = {
   exercise: Exercise;
   sets: SetRecord[];
   lastSet: SetRecord | null;
+  lastSessionDate: string | null;
+  lastSessionSets: SetRecord[];
   position: number;
 };
 

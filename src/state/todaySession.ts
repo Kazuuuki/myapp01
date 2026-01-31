@@ -5,8 +5,10 @@ import {
   addExerciseToToday,
   addSetQuick,
   createExerciseAndAddToToday,
+  deleteSetQuick,
   getOrCreateSessionByDate,
   getTodayExercises,
+  pastePreviousSetsToSession,
   removeExerciseFromToday,
   undoLastAction,
   updateSetQuick,
@@ -24,7 +26,7 @@ export function useTodaySession(date: string) {
     if (!session) {
       return;
     }
-    const items = await getTodayExercises(session.id);
+    const items = await getTodayExercises(session.id, date);
     setExercises(items);
     setUndoAvailable(!!getLastAction());
   }, [session]);
@@ -34,7 +36,7 @@ export function useTodaySession(date: string) {
       setLoading(true);
       const current = await getOrCreateSessionByDate(date);
       setSession(current);
-      const items = await getTodayExercises(current.id);
+      const items = await getTodayExercises(current.id, date);
       setExercises(items);
       setUndoAvailable(!!getLastAction());
     } catch (err) {
@@ -100,6 +102,28 @@ export function useTodaySession(date: string) {
     [refresh],
   );
 
+  const removeSet = useCallback(
+    async (setId: string) => {
+      await deleteSetQuick(setId);
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const pastePreviousSets = useCallback(
+    async (exerciseId: string) => {
+      if (!session) {
+        return false;
+      }
+      const didPaste = await pastePreviousSetsToSession(session.id, exerciseId, date);
+      if (didPaste) {
+        await refresh();
+      }
+      return didPaste;
+    },
+    [date, refresh, session],
+  );
+
   const undo = useCallback(async () => {
     const didUndo = await undoLastAction();
     if (didUndo) {
@@ -117,6 +141,8 @@ export function useTodaySession(date: string) {
     removeExercise,
     addSet,
     updateSet,
+    removeSet,
+    pastePreviousSets,
     undo,
     undoAvailable,
     refresh,

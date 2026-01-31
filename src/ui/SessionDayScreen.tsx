@@ -42,6 +42,8 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
     addExercise,
     addSet,
     updateSet,
+    removeSet,
+    pastePreviousSets,
     removeExercise,
     undo,
     undoAvailable,
@@ -160,6 +162,8 @@ export function SessionDayScreen({ date, title, subtitle }: Props) {
             unit={unit}
             onAddSet={addSet}
             onUpdateSet={updateSet}
+            onDeleteSet={removeSet}
+            onPastePrevious={pastePreviousSets}
             onDelete={handleDeleteExercise}
             onPress={(exerciseId) => router.push(`/exercise/${exerciseId}`)}
           />
