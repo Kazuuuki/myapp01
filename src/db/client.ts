@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 
+import { BODY_PARTS } from '@/src/models/exercises';
 import { schemaStatements } from './schema';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -26,6 +27,25 @@ async function initDb(): Promise<void> {
   const hasBodyPart = columns.some((column) => column.name === 'body_part');
   if (!hasBodyPart) {
     await db.execAsync('ALTER TABLE exercises ADD COLUMN body_part TEXT;');
+  }
+  await seedPresetExercises(db);
+}
+
+async function seedPresetExercises(db: SQLite.SQLiteDatabase): Promise<void> {
+  for (const part of BODY_PARTS) {
+    const bodyPartId = generateId('body_part');
+    await db.runAsync('INSERT OR IGNORE INTO body_parts (id, name, is_preset) VALUES (?, ?, 1);', [
+      bodyPartId,
+      part.label,
+    ]);
+
+    for (const exerciseName of part.exercises) {
+      const exerciseId = generateId('exercise');
+      await db.runAsync(
+        'INSERT OR IGNORE INTO exercises (id, name, body_part, memo) VALUES (?, ?, ?, NULL);',
+        [exerciseId, exerciseName, part.label],
+      );
+    }
   }
 }
 

@@ -13,6 +13,11 @@ export type Exercise = {
   memo: string | null;
 };
 
+export type BodyPart = {
+  id: string;
+  name: string;
+};
+
 export type SessionExercise = {
   id: string;
   sessionId: string;

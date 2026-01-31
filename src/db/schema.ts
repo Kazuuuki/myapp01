@@ -11,6 +11,11 @@ export const schemaStatements = [
     body_part TEXT,
     memo TEXT
   );`,
+  `CREATE TABLE IF NOT EXISTS body_parts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    is_preset INTEGER NOT NULL DEFAULT 0
+  );`,
   `CREATE TABLE IF NOT EXISTS session_exercises (
     id TEXT PRIMARY KEY,
     session_id TEXT NOT NULL,
@@ -32,4 +37,6 @@ export const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_set_records_session_exercise ON set_records(session_id, exercise_id);`,
   `CREATE INDEX IF NOT EXISTS idx_session_exercises_session_position ON session_exercises(session_id, position);`,
   `CREATE INDEX IF NOT EXISTS idx_workout_sessions_date ON workout_sessions(date);`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_body_parts_name ON body_parts(name);`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_exercises_name_body_part ON exercises(name, body_part);`,
 ];

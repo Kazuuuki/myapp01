@@ -49,3 +49,13 @@ export async function getExerciseByName(name: string): Promise<Exercise | null> 
     [name],
   );
 }
+
+export async function getExercisesByBodyPart(bodyPart: string): Promise<Exercise[]> {
+  return queryAll<Exercise>(
+    `SELECT id, name, body_part as bodyPart, memo
+     FROM exercises
+     WHERE body_part = ?
+     ORDER BY name ASC;`,
+    [bodyPart],
+  );
+}
