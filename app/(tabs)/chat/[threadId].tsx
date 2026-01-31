@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,96 +12,154 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { AI_CHAT_ENDPOINT, buildAiChatRequest } from '@/constants/ai-config';
+import { AI_CHAT_ENDPOINT, AiChatHistoryItem, buildAiChatRequest } from '@/constants/ai-config';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ChatMessage, ChatThread } from '@/src/models/types';
+import {
+  DEFAULT_CHAT_TITLE,
+  addThreadMessage,
+  deleteChatThread,
+  deriveThreadTitle,
+  getChatThread,
+  listChatMessages,
+  touchChatThread,
+  updateChatThreadTitle,
+} from '@/src/usecases/chat';
 
-type Message = {
-  id: string;
-  role: 'user' | 'bot';
-  text: string;
+type MessageView = ChatMessage & {
   status?: 'sending' | 'sent' | 'failed';
 };
 
-function makeId() {
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function buildHistory(messages: MessageView[], limit = 10, excludeId?: string): AiChatHistoryItem[] {
+  const filtered = messages
+    .filter((message) => message.status !== 'failed' && message.id !== excludeId)
+    .map((message) => ({ role: message.role, text: message.text }));
+  if (filtered.length <= limit) {
+    return filtered;
+  }
+  return filtered.slice(filtered.length - limit);
 }
 
-export default function ChatScreen() {
+export default function ChatThreadScreen() {
+  const { threadId } = useLocalSearchParams<{ threadId: string }>();
+  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>(() => [
-    {
-      id: makeId(),
-      role: 'bot',
-      text: 'Hi! Share your training goal or attach a form photo for feedback.',
-    },
-  ]);
-  const listRef = useRef<FlatList<Message>>(null);
+  const [thread, setThread] = useState<ChatThread | null>(null);
+  const [messages, setMessages] = useState<MessageView[]>([]);
+  const [loading, setLoading] = useState(true);
+  const listRef = useRef<FlatList<MessageView>>(null);
+
+  const loadThread = useCallback(async () => {
+    if (!threadId) {
+      return;
+    }
+    setLoading(true);
+    const [threadData, messageData] = await Promise.all([
+      getChatThread(String(threadId)),
+      listChatMessages(String(threadId)),
+    ]);
+    setThread(threadData);
+    setMessages(messageData);
+    setLoading(false);
+  }, [threadId]);
+
+  useEffect(() => {
+    loadThread();
+  }, [loadThread]);
 
   const handleAttach = () => {
     Alert.alert('Images coming soon', 'Image upload is not available yet. Please send text for now.');
+  };
+
+  const handleDeleteThread = () => {
+    if (!threadId) {
+      return;
+    }
+    Alert.alert('Delete chat?', 'This will remove the entire conversation.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteChatThread(String(threadId));
+          router.replace('/chat');
+        },
+      },
+    ]);
   };
 
   const sendDisabled = useMemo(() => {
     return input.trim().length === 0;
   }, [input]);
 
-  const markMessageStatus = (id: string, status: Message['status']) => {
+  const markMessageStatus = (id: string, status: MessageView['status']) => {
     setMessages((prev) =>
       prev.map((message) => (message.id === id ? { ...message, status } : message)),
     );
   };
 
-  const sendToApi = async (id: string, text: string) => {
+  const sendToApi = async (id: string, text: string, history: AiChatHistoryItem[]) => {
+    if (!threadId) {
+      markMessageStatus(id, 'failed');
+      return;
+    }
     try {
+      const payload = buildAiChatRequest(text, history);
       const response = await fetch(AI_CHAT_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildAiChatRequest(text)),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`);
+        const errorBody = await response.text();
+        throw new Error(`Request failed: ${response.status} ${errorBody}`);
       }
-      const data = (await response.json()) as { text?: string };
+      const raw = await response.text();
+      const data = raw ? (JSON.parse(raw) as { text?: string }) : {};
       const reply = data.text?.trim();
       if (!reply) {
         throw new Error('Empty response');
       }
+      const now = new Date().toISOString();
+      const botMessage = await addThreadMessage(String(threadId), 'bot', reply, now);
+      await touchChatThread(String(threadId), now);
       markMessageStatus(id, 'sent');
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: makeId(),
-          role: 'bot',
-          text: reply,
-        },
-      ]);
+      setMessages((prev) => [...prev, botMessage]);
     } catch (error) {
+      console.warn('AI chat request failed', error);
       markMessageStatus(id, 'failed');
     }
   };
 
-  const handleSend = () => {
-    if (sendDisabled) {
+  const handleSend = async () => {
+    if (sendDisabled || !threadId) {
       return;
     }
     const text = input.trim();
     if (!text) {
       return;
     }
-    const nextMessage: Message = {
-      id: makeId(),
-      role: 'user',
-      text,
-      status: 'sending',
-    };
-    setMessages((prev) => [...prev, nextMessage]);
+    const history = buildHistory(messages, 10);
+    const now = new Date().toISOString();
+    const userMessage = await addThreadMessage(String(threadId), 'user', text, now);
+    await touchChatThread(String(threadId), now);
+
+    setMessages((prev) => [...prev, { ...userMessage, status: 'sending' }]);
     setInput('');
-    sendToApi(nextMessage.id, text);
+
+    if (thread && thread.title === DEFAULT_CHAT_TITLE) {
+      const nextTitle = deriveThreadTitle(text);
+      await updateChatThreadTitle(String(threadId), nextTitle, now);
+      setThread((prev) => (prev ? { ...prev, title: nextTitle, updatedAt: now } : prev));
+    }
+
+    sendToApi(userMessage.id, text, history);
   };
 
   const handleRetry = (id: string) => {
@@ -110,10 +168,11 @@ export default function ChatScreen() {
       return;
     }
     markMessageStatus(id, 'sending');
-    sendToApi(id, message.text);
+    const history = buildHistory(messages, 10, id);
+    sendToApi(id, message.text, history);
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
+  const renderMessage = ({ item }: { item: MessageView }) => {
     const isUser = item.role === 'user';
     const bubbleStyle = isUser
       ? [styles.bubble, styles.bubbleUser, { backgroundColor: colors.primary }]
@@ -147,14 +206,30 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}> 
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 16 : 0}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Chat Coach</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedText }]}>Ask about training or attach a form photo.</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.back()}
+            style={[styles.backButton, { borderColor: colors.border }]}>
+            <Text style={[styles.backText, { color: colors.text }]}>{'<'}</Text>
+          </Pressable>
+          <View style={styles.headerText}>
+            <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+              {thread?.title ?? 'Chat'}
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.mutedText }]}>Ask about training or attach a form photo.</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleDeleteThread}
+            style={[styles.deleteThreadButton, { borderColor: colors.border }]}>
+            <Text style={[styles.deleteThreadText, { color: colors.dangerText }]}>Delete</Text>
+          </Pressable>
         </View>
 
         <FlatList
@@ -166,6 +241,15 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           onLayout={() => listRef.current?.scrollToEnd({ animated: false })}
+          ListEmptyComponent={
+            loading ? (
+              <ActivityIndicator style={{ marginTop: 24 }} />
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptyText, { color: colors.mutedText }]}>No messages yet.</Text>
+              </View>
+            )
+          }
         />
 
         <View style={[styles.composer, { backgroundColor: colors.card, borderColor: colors.border }]}> 
@@ -187,12 +271,14 @@ export default function ChatScreen() {
               styles.sendButton,
               { backgroundColor: sendDisabled ? colors.secondary : colors.primary },
             ]}>
-            <IconSymbol name="paperplane.fill" size={18} color={sendDisabled ? colors.mutedText : colors.primaryText} />
+            <IconSymbol
+              name="paperplane.fill"
+              size={18}
+              color={sendDisabled ? colors.mutedText : colors.primaryText}
+            />
           </Pressable>
         </View>
-        <Text style={[styles.helperText, { color: colors.mutedText }]}>
-          Image uploads are not available yet. Text chat only for now.
-        </Text>
+        <Text style={[styles.helperText, { color: colors.mutedText }]}>Image uploads are not available yet. Text chat only for now.</Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -209,10 +295,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerText: {
+    flex: 1,
     gap: 4,
   },
+  backButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  backText: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  deleteThreadButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  deleteThreadText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   title: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '700',
   },
   subtitle: {
@@ -223,6 +335,13 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
     gap: 16,
+  },
+  emptyState: {
+    paddingTop: 32,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 12,
   },
   messageRow: {
     flexDirection: 'row',

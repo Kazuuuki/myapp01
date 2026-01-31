@@ -36,9 +36,25 @@ export const schemaStatements = [
     FOREIGN KEY (session_id) REFERENCES workout_sessions(id) ON DELETE CASCADE,
     FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
   );`,
+  `CREATE TABLE IF NOT EXISTS chat_threads (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS chat_messages (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (thread_id) REFERENCES chat_threads(id) ON DELETE CASCADE
+  );`,
   `CREATE INDEX IF NOT EXISTS idx_set_records_session_exercise ON set_records(session_id, exercise_id);`,
   `CREATE INDEX IF NOT EXISTS idx_session_exercises_session_position ON session_exercises(session_id, position);`,
   `CREATE INDEX IF NOT EXISTS idx_workout_sessions_date ON workout_sessions(date);`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_body_parts_name ON body_parts(name);`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_exercises_name_body_part ON exercises(name, body_part);`,
+  `CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_created ON chat_messages(thread_id, created_at);`,
+  `CREATE INDEX IF NOT EXISTS idx_chat_threads_updated_at ON chat_threads(updated_at);`,
 ];

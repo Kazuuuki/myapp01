@@ -81,3 +81,26 @@ export type ExerciseSummary = {
   maxWeight: number | null;
   maxReps: number | null;
 };
+
+export type ChatMessageRole = 'user' | 'bot';
+
+export type ChatThread = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  threadId: string;
+  role: ChatMessageRole;
+  text: string;
+  createdAt: string;
+};
+
+export type ChatThreadSummary = ChatThread & {
+  lastMessageText: string | null;
+  lastMessageAt: string | null;
+  lastMessageRole: ChatMessageRole | null;
+};
