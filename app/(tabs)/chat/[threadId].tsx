@@ -109,12 +109,16 @@ export default function ChatThreadScreen() {
       markMessageStatus(id, 'failed');
       return;
     }
+    const payload = buildAiChatRequest(text, history);
+    const payloadJson = JSON.stringify(payload);
     try {
-      const payload = buildAiChatRequest(text, history);
       const response = await fetch(AI_CHAT_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-request-id': id,
+        },
+        body: payloadJson,
       });
       if (!response.ok) {
         const errorBody = await response.text();
