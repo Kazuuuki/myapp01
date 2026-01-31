@@ -28,6 +28,10 @@ async function initDb(): Promise<void> {
   if (!hasBodyPart) {
     await db.execAsync('ALTER TABLE exercises ADD COLUMN body_part TEXT;');
   }
+  const hasImageUris = columns.some((column) => column.name === 'image_uris');
+  if (!hasImageUris) {
+    await db.execAsync('ALTER TABLE exercises ADD COLUMN image_uris TEXT;');
+  }
   const setColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(set_records);');
   const hasSetMemo = setColumns.some((column) => column.name === 'memo');
   if (!hasSetMemo) {
@@ -47,7 +51,7 @@ async function seedPresetExercises(db: SQLite.SQLiteDatabase): Promise<void> {
     for (const exerciseName of part.exercises) {
       const exerciseId = generateId('exercise');
       await db.runAsync(
-        'INSERT OR IGNORE INTO exercises (id, name, body_part, memo) VALUES (?, ?, ?, NULL);',
+        'INSERT OR IGNORE INTO exercises (id, name, body_part, memo, image_uris) VALUES (?, ?, ?, NULL, NULL);',
         [exerciseId, exerciseName, part.label],
       );
     }

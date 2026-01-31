@@ -1,6 +1,21 @@
 import { executeSql, generateId, queryAll, queryFirst } from '@/src/db/client';
 import { Exercise, SessionExercise, WorkoutSession } from '@/src/models/types';
 
+function parseImageUris(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === 'string');
+    }
+  } catch {
+    return [];
+  }
+  return [];
+}
+
 export async function createSession(date: string, startTime: string): Promise<WorkoutSession> {
   const session: WorkoutSession = {
     id: generateId('session'),
@@ -88,9 +103,10 @@ export async function getExercisesBySession(
     name: string;
     bodyPart: string | null;
     memo: string | null;
+    imageUris: string | null;
     position: number;
   }>(
-    `SELECT e.id as id, e.name as name, e.body_part as bodyPart, e.memo as memo, se.position as position
+    `SELECT e.id as id, e.name as name, e.body_part as bodyPart, e.memo as memo, e.image_uris as imageUris, se.position as position
      FROM session_exercises se
      JOIN exercises e ON e.id = se.exercise_id
      WHERE se.session_id = ?
@@ -98,7 +114,13 @@ export async function getExercisesBySession(
     [sessionId],
   ).then((rows) =>
     rows.map((row) => ({
-      exercise: { id: row.id, name: row.name, bodyPart: row.bodyPart ?? null, memo: row.memo ?? null },
+      exercise: {
+        id: row.id,
+        name: row.name,
+        bodyPart: row.bodyPart ?? null,
+        memo: row.memo ?? null,
+        images: parseImageUris(row.imageUris),
+      },
       position: row.position,
     })),
   );

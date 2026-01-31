@@ -1,13 +1,39 @@
 import { queryAll } from '@/src/db/client';
 import { Exercise, SessionExercise, SetRecord, WorkoutSession } from '@/src/models/types';
 
+function parseImageUris(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === 'string');
+    }
+  } catch {
+    return [];
+  }
+  return [];
+}
+
 export async function exportAllToJson(): Promise<string> {
   const sessions = await queryAll<WorkoutSession>(
     `SELECT id, date, start_time as startTime FROM workout_sessions ORDER BY date ASC;`,
   );
-  const exercises = await queryAll<Exercise>(
-    `SELECT id, name, body_part as bodyPart, memo FROM exercises ORDER BY name ASC;`,
-  );
+  const exerciseRows = await queryAll<{
+    id: string;
+    name: string;
+    bodyPart: string | null;
+    memo: string | null;
+    imageUris: string | null;
+  }>(`SELECT id, name, body_part as bodyPart, memo, image_uris as imageUris FROM exercises ORDER BY name ASC;`);
+  const exercises: Exercise[] = exerciseRows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    bodyPart: row.bodyPart ?? null,
+    memo: row.memo ?? null,
+    images: parseImageUris(row.imageUris),
+  }));
   const sessionExercises = await queryAll<SessionExercise>(
     `SELECT id, session_id as sessionId, exercise_id as exerciseId, position FROM session_exercises ORDER BY session_id ASC, position ASC;`,
   );

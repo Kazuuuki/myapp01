@@ -11,6 +11,7 @@ export type Exercise = {
   name: string;
   bodyPart: string | null;
   memo: string | null;
+  images: string[];
 };
 
 export type BodyPart = {

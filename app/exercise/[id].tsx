@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ExerciseSummary } from '@/src/models/types';
 import { toDisplayWeight } from '@/src/models/units';
+import { updateExerciseImages } from '@/src/repo/exerciseRepo';
 import { useUnitPreference } from '@/src/state/unitPreference';
 import { getExerciseSummary } from '@/src/usecases/exerciseDetail';
 
@@ -15,6 +28,8 @@ export default function ExerciseDetailScreen() {
   const colors = Colors[colorScheme];
   const { unit } = useUnitPreference();
   const [summary, setSummary] = useState<ExerciseSummary | null>(null);
+  const [imageUris, setImageUris] = useState<string[]>([]);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,6 +41,7 @@ export default function ExerciseDetailScreen() {
       .then((data) => {
         if (mounted) {
           setSummary(data);
+          setImageUris(data?.exercise.images ?? []);
         }
       })
       .finally(() => {
@@ -54,11 +70,97 @@ export default function ExerciseDetailScreen() {
     );
   }
 
+  const saveImages = async (next: string[]) => {
+    if (!summary) {
+      return;
+    }
+    try {
+      await updateExerciseImages(summary.exercise.id, next);
+      setImageUris(next);
+      setSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              exercise: {
+                ...prev.exercise,
+                images: next,
+              },
+            }
+          : prev,
+      );
+    } catch {
+      Alert.alert('Failed to save images', 'Please try again.');
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={[styles.title, { color: colors.text }]}>{summary.exercise.name}</Text>
         <Text style={[styles.bodyPart, { color: colors.mutedText }]}>Body part: {summary.exercise.bodyPart ?? '-'}</Text>
+
+        <View style={[styles.imageSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.imageHeader}>
+            <Text style={[styles.imageTitle, { color: colors.text }]}>Images</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={async () => {
+                const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                if (!permission.granted) {
+                  Alert.alert('Permission required', 'Allow photo library access to add images.');
+                  return;
+                }
+                const result = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  allowsMultipleSelection: true,
+                  selectionLimit: 0,
+                  quality: 1,
+                });
+                if (result.canceled) {
+                  return;
+                }
+                const nextUris = result.assets.map((asset) => asset.uri);
+                const merged = Array.from(new Set([...imageUris, ...nextUris]));
+                await saveImages(merged);
+              }}
+              style={[styles.imageAddButton, { backgroundColor: colors.primary }]}
+            >
+              <Text style={[styles.imageAddText, { color: colors.primaryText }]}>Add</Text>
+            </Pressable>
+          </View>
+          {imageUris.length === 0 ? (
+            <Text style={[styles.empty, { color: colors.mutedText }]}>No images yet.</Text>
+          ) : (
+            <>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageList}>
+                {imageUris.map((uri) => (
+                  <Pressable
+                    key={uri}
+                    accessibilityRole="button"
+                    onPress={() => setSelectedImageUri(uri)}
+                    onLongPress={() =>
+                      Alert.alert('Remove image?', 'This will remove the image from this exercise.', [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Remove',
+                          style: 'destructive',
+                          onPress: async () => {
+                            const next = imageUris.filter((item) => item !== uri);
+                            await saveImages(next);
+                          },
+                        },
+                      ])
+                    }
+                    style={[styles.imageItem, { borderColor: colors.border }]}
+                  >
+                    <Image source={{ uri }} style={styles.image} />
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Text style={[styles.imageHint, { color: colors.mutedText }]}>Tap to preview, long-press to remove.</Text>
+            </>
+          )}
+        </View>
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>Best Volume</Text>
@@ -97,6 +199,17 @@ export default function ExerciseDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      <Modal visible={!!selectedImageUri} transparent animationType="fade" onRequestClose={() => setSelectedImageUri(null)}>
+        <View style={[styles.previewOverlay, { backgroundColor: colors.background }]}>
+          <Pressable style={styles.previewCloseArea} onPress={() => setSelectedImageUri(null)}>
+            <Text style={[styles.previewCloseText, { color: colors.primaryText }]}>Close</Text>
+          </Pressable>
+          {selectedImageUri ? (
+            <Image source={{ uri: selectedImageUri }} style={styles.previewImage} resizeMode="contain" />
+          ) : null}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -157,5 +270,67 @@ const styles = StyleSheet.create({
   error: {
     marginTop: 40,
     textAlign: 'center',
+  },
+  imageSection: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    gap: 12,
+  },
+  imageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  imageTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  imageAddButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  imageAddText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  imageList: {
+    gap: 12,
+    paddingVertical: 4,
+  },
+  imageItem: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  image: {
+    width: 140,
+    height: 140,
+  },
+  imageHint: {
+    fontSize: 11,
+  },
+  previewOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewCloseArea: {
+    position: 'absolute',
+    top: 48,
+    right: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  previewCloseText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  previewImage: {
+    width: '92%',
+    height: '80%',
   },
 });

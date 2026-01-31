@@ -9,7 +9,8 @@ export const schemaStatements = [
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     body_part TEXT,
-    memo TEXT
+    memo TEXT,
+    image_uris TEXT
   );`,
   `CREATE TABLE IF NOT EXISTS body_parts (
     id TEXT PRIMARY KEY,
