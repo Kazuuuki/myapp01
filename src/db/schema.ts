@@ -30,6 +30,7 @@ export const schemaStatements = [
     exercise_id TEXT NOT NULL,
     weight REAL NOT NULL,
     reps INTEGER NOT NULL,
+    memo TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (session_id) REFERENCES workout_sessions(id) ON DELETE CASCADE,
     FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE

@@ -31,6 +31,7 @@ export type SetRecord = {
   exerciseId: string;
   weight: number;
   reps: number;
+  memo: string | null;
   createdAt: string; // ISO string
 };
 

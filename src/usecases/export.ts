@@ -12,7 +12,7 @@ export async function exportAllToJson(): Promise<string> {
     `SELECT id, session_id as sessionId, exercise_id as exerciseId, position FROM session_exercises ORDER BY session_id ASC, position ASC;`,
   );
   const sets = await queryAll<SetRecord>(
-    `SELECT id, session_id as sessionId, exercise_id as exerciseId, weight, reps, created_at as createdAt
+    `SELECT id, session_id as sessionId, exercise_id as exerciseId, weight, reps, memo, created_at as createdAt
      FROM set_records ORDER BY created_at ASC;`,
   );
 
@@ -29,11 +29,11 @@ export async function exportAllToJson(): Promise<string> {
 
 export async function exportSetsToCsv(): Promise<string> {
   const rows = await queryAll<SetRecord>(
-    `SELECT id, session_id as sessionId, exercise_id as exerciseId, weight, reps, created_at as createdAt
+    `SELECT id, session_id as sessionId, exercise_id as exerciseId, weight, reps, memo, created_at as createdAt
      FROM set_records ORDER BY created_at ASC;`,
   );
 
-  const header = ['id', 'session_id', 'exercise_id', 'weight', 'reps', 'created_at'];
+  const header = ['id', 'session_id', 'exercise_id', 'weight', 'reps', 'memo', 'created_at'];
   const lines = [header.join(',')];
 
   for (const row of rows) {
@@ -43,6 +43,7 @@ export async function exportSetsToCsv(): Promise<string> {
       row.exerciseId,
       row.weight.toString(),
       row.reps.toString(),
+      row.memo ?? '',
       row.createdAt,
     ];
     lines.push(line.join(','));

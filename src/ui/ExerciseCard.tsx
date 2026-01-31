@@ -10,7 +10,7 @@ type Props = {
   item: ExerciseWithSets;
   unit: WeightUnit;
   onAddSet: (exerciseId: string) => void;
-  onUpdateSet: (setId: string, weight: number, reps: number) => void;
+  onUpdateSet: (setId: string, weight: number, reps: number, memo: string | null) => void;
   onDeleteSet: (setId: string) => void;
   onPastePrevious: (exerciseId: string) => Promise<boolean> | boolean;
   onPress: (exerciseId: string) => void;

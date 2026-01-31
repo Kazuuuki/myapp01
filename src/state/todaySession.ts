@@ -90,8 +90,8 @@ export function useTodaySession(date: string) {
   );
 
   const updateSet = useCallback(
-    async (setId: string, weight: number, reps: number) => {
-      await updateSetQuick(setId, weight, reps);
+    async (setId: string, weight: number, reps: number, memo: string | null) => {
+      await updateSetQuick(setId, weight, reps, memo);
       await refresh();
     },
     [refresh],

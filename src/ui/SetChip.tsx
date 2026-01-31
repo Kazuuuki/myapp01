@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -11,7 +11,7 @@ type Props = {
   index: number;
   set: SetRecord;
   unit: WeightUnit;
-  onUpdate: (setId: string, weight: number, reps: number) => void;
+  onUpdate: (setId: string, weight: number, reps: number, memo: string | null) => void;
   onDelete: (setId: string) => void;
 };
 
@@ -20,29 +20,87 @@ export function SetChip({ index, set, unit, onUpdate, onDelete }: Props) {
   const colors = Colors[colorScheme];
   const [weightDisplay, setWeightDisplay] = useState(toDisplayWeight(set.weight, unit));
   const [reps, setReps] = useState(set.reps);
+  const [memoText, setMemoText] = useState(set.memo ?? '');
+  const [showMemo, setShowMemo] = useState(Boolean(set.memo?.trim()));
 
   useEffect(() => {
     setWeightDisplay(toDisplayWeight(set.weight, unit));
     setReps(set.reps);
-  }, [set.weight, set.reps, unit]);
+    setMemoText(set.memo ?? '');
+    setShowMemo(Boolean(set.memo?.trim()));
+  }, [set.weight, set.reps, set.memo, unit]);
 
   const handleWeightChange = (nextValue: number) => {
     setWeightDisplay(nextValue);
     const weightKg = fromDisplayWeight(nextValue, unit);
-    onUpdate(set.id, weightKg, reps);
+    onUpdate(set.id, weightKg, reps, memoText.trim() === '' ? null : memoText);
   };
 
   const handleRepsChange = (nextReps: number) => {
     const nextInt = Math.max(1, Math.round(nextReps));
     setReps(nextInt);
     const weightKg = fromDisplayWeight(weightDisplay, unit);
-    onUpdate(set.id, weightKg, nextInt);
+    onUpdate(set.id, weightKg, nextInt, memoText.trim() === '' ? null : memoText);
+  };
+
+  const handleMemoBlur = () => {
+    const weightKg = fromDisplayWeight(weightDisplay, unit);
+    const nextMemo = memoText.trim() === '' ? null : memoText;
+    if (!nextMemo) {
+      setShowMemo(false);
+    }
+    onUpdate(set.id, weightKg, reps, nextMemo);
+  };
+
+  const handleMenuPress = () => {
+    const hasMemo = memoText.trim().length > 0;
+
+    Alert.alert('オプション', undefined, [
+      ...(!hasMemo
+        ? [
+            {
+              text: 'メモを追加',
+              onPress: () => setShowMemo(true),
+            },
+          ]
+        : []),
+      ...(hasMemo
+        ? [
+            {
+              text: 'メモを削除',
+              style: 'destructive',
+              onPress: () => {
+                const weightKg = fromDisplayWeight(weightDisplay, unit);
+                setMemoText('');
+                setShowMemo(false);
+                onUpdate(set.id, weightKg, reps, null);
+              },
+            },
+          ]
+        : []),
+      {
+        text: 'セットを削除',
+        style: 'destructive',
+        onPress: () => onDelete(set.id),
+      },
+      { text: 'キャンセル', style: 'cancel' },
+    ]);
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.chip }]}>
       <View style={styles.content}>
-        <Text style={[styles.setLabel, { color: colors.subtleText }]}>Set {index + 1}</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.setLabel, { color: colors.subtleText }]}>Set {index + 1}</Text>
+          <Pressable
+            style={[
+              styles.menuButton,
+              { backgroundColor: colors.secondary },
+            ]}
+            onPress={handleMenuPress}>
+            <Text style={[styles.menuButtonText, { color: colors.text }]}>⋮</Text>
+          </Pressable>
+        </View>
         <NumberStepper
           label={`Weight (${unit})`}
           value={weightDisplay}
@@ -51,12 +109,20 @@ export function SetChip({ index, set, unit, onUpdate, onDelete }: Props) {
           onChange={handleWeightChange}
         />
         <NumberStepper label="Reps" value={reps} step={1} min={1} onChange={handleRepsChange} />
+        {showMemo ? (
+          <TextInput
+            value={memoText}
+            onChangeText={setMemoText}
+            onEndEditing={handleMemoBlur}
+            placeholder="Memo"
+            placeholderTextColor={colors.mutedText}
+            style={[
+              styles.memoInput,
+              { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground },
+            ]}
+          />
+        ) : null}
       </View>
-      <Pressable
-        style={[styles.deleteButton, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
-        onPress={() => onDelete(set.id)}>
-        <Text style={[styles.deleteText, { color: colors.mutedText }]}>-</Text>
-      </Pressable>
     </View>
   );
 }
@@ -74,21 +140,36 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 8,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   setLabel: {
     fontSize: 12,
     fontWeight: '600',
   },
-  deleteButton: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1,
+  menuButton: {
+    borderRadius: 999,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 'auto',
+    marginRight: 1,
   },
-  deleteText: {
+  menuButtonText: {
     fontSize: 16,
     fontWeight: '700',
     lineHeight: 16,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  memoInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 12,
   },
 });

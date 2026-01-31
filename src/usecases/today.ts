@@ -108,11 +108,11 @@ export async function addSetQuick(sessionId: string, exerciseId: string) {
   const lastSet = await getLastSetByExercise(exerciseId);
   const weight = lastSet?.weight ?? 0;
   const reps = lastSet?.reps ?? 10;
-  return addSet(sessionId, exerciseId, weight, reps);
+  return addSet(sessionId, exerciseId, weight, reps, null);
 }
 
-export async function updateSetQuick(setId: string, weight: number, reps: number) {
-  await updateSet(setId, weight, reps);
+export async function updateSetQuick(setId: string, weight: number, reps: number, memo: string | null) {
+  await updateSet(setId, weight, reps, memo);
 }
 
 export async function deleteSetQuick(setId: string) {
@@ -134,7 +134,7 @@ export async function pastePreviousSetsToSession(
   }
   await deleteSetsBySessionAndExercise(sessionId, exerciseId);
   for (const set of previousSets) {
-    await addSet(sessionId, exerciseId, set.weight, set.reps);
+    await addSet(sessionId, exerciseId, set.weight, set.reps, set.memo ?? null);
   }
   return true;
 }

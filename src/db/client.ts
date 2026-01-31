@@ -28,6 +28,11 @@ async function initDb(): Promise<void> {
   if (!hasBodyPart) {
     await db.execAsync('ALTER TABLE exercises ADD COLUMN body_part TEXT;');
   }
+  const setColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(set_records);');
+  const hasSetMemo = setColumns.some((column) => column.name === 'memo');
+  if (!hasSetMemo) {
+    await db.execAsync('ALTER TABLE set_records ADD COLUMN memo TEXT;');
+  }
   await seedPresetExercises(db);
 }
 
