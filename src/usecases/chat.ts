@@ -10,8 +10,8 @@ import {
   updateChatThreadTitle as updateChatThreadTitleRepo,
 } from '@/src/repo/chatRepo';
 
-export const DEFAULT_CHAT_TITLE = 'New chat';
-export const DEFAULT_GREETING = 'Hi! Share your training goal or attach a form photo for feedback.';
+export const DEFAULT_CHAT_TITLE = '新しいチャット';
+export const DEFAULT_GREETING = 'こんにちは！トレーニングの相談や、フォーム改善の質問を送ってください。';
 
 export async function listChatThreads(): Promise<ChatThreadSummary[]> {
   return listChatThreadsRepo();

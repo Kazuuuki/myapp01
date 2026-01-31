@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 
 import { Colors } from '@/constants/theme';
@@ -19,6 +20,7 @@ import { useUnitPreference } from '@/src/state/unitPreference';
 import { exportAllToJson, exportSetsToCsv } from '@/src/usecases/export';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const { unit, setUnit } = useUnitPreference();
@@ -51,30 +53,30 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteAll = () => {
-    Alert.alert('Delete all data?', 'This will remove all sessions and exercises.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert('全データを削除しますか？', 'セッション、種目、チャット、プロフィールが削除されます。', [
+      { text: 'キャンセル', style: 'cancel' },
       {
-        text: 'Delete',
+        text: '削除',
         style: 'destructive',
         onPress: async () => {
           await deleteAll();
-          Alert.alert('Deleted', 'All data has been removed.');
+          Alert.alert('削除しました', 'データを削除しました。');
         },
       },
     ]);
   };
 
   const handleFeedback = () => {
-    Alert.alert('Feedback', 'Feedback form is coming soon.');
+    Alert.alert('フィードバック', 'フィードバック機能は準備中です。');
   };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
+        <Text style={[styles.title, { color: colors.text }]}>設定</Text>
 
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>Unit</Text>
+          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>単位</Text>
           <View style={[styles.segment, { borderColor: colors.inputBorder }]}>
             <Pressable
               style={[
@@ -112,24 +114,24 @@ export default function SettingsScreen() {
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>Export</Text>
+          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>エクスポート</Text>
           <Pressable
             style={[styles.actionButton, { borderColor: colors.inputBorder }]}
             onPress={handleExportJson}
             disabled={exporting}>
-            <Text style={[styles.actionText, { color: colors.text }]}>Export JSON</Text>
+            <Text style={[styles.actionText, { color: colors.text }]}>{exporting ? '出力中…' : 'JSONを共有'}</Text>
           </Pressable>
           <Pressable
             style={[styles.actionButton, { borderColor: colors.inputBorder }]}
             onPress={handleExportCsv}
             disabled={exporting}>
-            <Text style={[styles.actionText, { color: colors.text }]}>Export CSV</Text>
+            <Text style={[styles.actionText, { color: colors.text }]}>{exporting ? '出力中…' : 'CSVを共有'}</Text>
           </Pressable>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>Appearance</Text>
-          <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Theme</Text>
+          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>表示</Text>
+          <Text style={[styles.inputLabel, { color: colors.mutedText }]}>テーマ</Text>
           <View style={[styles.segment, { borderColor: colors.inputBorder }]}>
             <Pressable
               style={[
@@ -144,7 +146,7 @@ export default function SettingsScreen() {
                   { color: colors.text },
                   preference === 'system' && { color: colors.primaryText },
                 ]}>
-                Auto
+                自動
               </Text>
             </Pressable>
             <Pressable
@@ -160,7 +162,7 @@ export default function SettingsScreen() {
                   { color: colors.text },
                   preference === 'light' && { color: colors.primaryText },
                 ]}>
-                Light
+                ライト
               </Text>
             </Pressable>
             <Pressable
@@ -176,34 +178,43 @@ export default function SettingsScreen() {
                   { color: colors.text },
                   preference === 'dark' && { color: colors.primaryText },
                 ]}>
-                Dark
+                ダーク
               </Text>
             </Pressable>
           </View>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>About</Text>
+          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>プロフィール</Text>
+          <Pressable
+            style={[styles.actionButton, { borderColor: colors.inputBorder }]}
+            onPress={() => router.push('/profile')}>
+            <Text style={[styles.actionText, { color: colors.text }]}>プロフィールを編集</Text>
+          </Pressable>
+        </View>
+
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>情報</Text>
           <View style={styles.row}>
-            <Text style={[styles.rowLabel, { color: colors.text }]}>Version</Text>
+            <Text style={[styles.rowLabel, { color: colors.text }]}>バージョン</Text>
             <Text style={[styles.rowValue, { color: colors.mutedText }]}>
               {version} ({buildNumber})
             </Text>
           </View>
           <Pressable style={[styles.actionButton, { borderColor: colors.inputBorder }]} onPress={handleFeedback}>
-            <Text style={[styles.actionText, { color: colors.text }]}>Send Feedback</Text>
+            <Text style={[styles.actionText, { color: colors.text }]}>フィードバックを送る</Text>
           </Pressable>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>Danger Zone</Text>
+          <Text style={[styles.sectionTitle, { color: colors.subtleText }]}>危険な操作</Text>
           <Pressable
             style={[
               styles.actionButton,
               { borderColor: colors.dangerBorder, backgroundColor: colors.dangerBackground },
             ]}
             onPress={handleDeleteAll}>
-            <Text style={[styles.actionText, { color: colors.dangerText }]}>Delete All Data</Text>
+            <Text style={[styles.actionText, { color: colors.dangerText }]}>全データを削除</Text>
           </Pressable>
         </View>
       </ScrollView>
