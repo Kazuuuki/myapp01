@@ -87,35 +87,113 @@ export default function HistoryScreen() {
     marked[selectedDate] = {
       ...(marked[selectedDate] ?? {}),
       selected: true,
-      selectedColor: colors.primary,
+      selectedColor: colors.secondary,
     };
     return marked;
   }, [summaries, selectedDate, colors.primary]);
+
+  const calendarTheme = useMemo(
+    () => ({
+      backgroundColor: colors.card,
+      calendarBackground: colors.card,
+      todayTextColor: colors.text,
+      dayTextColor: colors.text,
+      selectedDayTextColor: colors.text,
+      selectedDayBackgroundColor: colors.secondary,
+      arrowColor: colors.text,
+      monthTextColor: colors.text,
+      textSectionTitleColor: colors.mutedText,
+      textDisabledColor: colors.mutedText,
+      textDayFontWeight: '600',
+      textMonthFontWeight: '700',
+      textDayHeaderFontWeight: '600',
+      'stylesheet.calendar.header': {
+        header: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: 8,
+          backgroundColor: colors.card,
+        },
+        arrow: {
+          padding: 8,
+        },
+        monthText: {
+          color: colors.text,
+          fontWeight: '700',
+        },
+        week: {
+          marginTop: 8,
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+          backgroundColor: colors.card,
+        },
+      },
+      'stylesheet.calendar.main': {
+        container: {
+          backgroundColor: colors.card,
+        },
+        monthView: {
+          backgroundColor: colors.card,
+        },
+        week: {
+          marginTop: 6,
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+          backgroundColor: colors.card,
+        },
+      },
+      'stylesheet.day.basic': {
+        base: {
+          backgroundColor: colors.card,
+          width: 34,
+          height: 34,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 17,
+        },
+        text: {
+          color: colors.text,
+          marginTop: 0,
+        },
+        today: {
+          color: colors.text,
+        },
+        selected: {
+          backgroundColor: colors.secondary,
+          borderRadius: 17,
+        },
+        disabledText: {
+          color: colors.mutedText,
+        },
+        dot: {
+          width: 4,
+          height: 4,
+          borderRadius: 2,
+          marginTop: 2,
+          alignSelf: 'center',
+        },
+      },
+    }),
+    [colors],
+  );
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={[styles.title, { color: colors.text }]}>History</Text>
 
-        <View style={[styles.calendarCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+        <View style={[styles.calendarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Calendar
+            key={colorScheme}
             current={selectedDate}
             onDayPress={(day) => {
               setSelectedDate(day.dateString);
             }}
             onMonthChange={(day) => loadMonth(day.year, day.month)}
             markedDates={markedDates}
-            theme={{
-              calendarBackground: colors.card,
-              todayTextColor: colors.text,
-              dayTextColor: colors.text,
-              arrowColor: colors.text,
-              monthTextColor: colors.text,
-              textSectionTitleColor: colors.mutedText,
-              textDayFontWeight: '600',
-              textMonthFontWeight: '700',
-              textDayHeaderFontWeight: '600',
-            }}
+            style={{ backgroundColor: colors.card }}
+            theme={calendarTheme}
           />
         </View>
 
