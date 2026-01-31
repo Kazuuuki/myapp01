@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
+import { useRouter } from 'expo-router';
 
 import { formatDateLocal } from '@/src/models/dates';
 import { SessionDateSummary, SessionDetail } from '@/src/models/types';
@@ -25,6 +27,7 @@ function getMonthRange(year: number, month: number) {
 }
 
 export default function HistoryScreen() {
+  const router = useRouter();
   const { unit } = useUnitPreference();
   const today = formatDateLocal(new Date());
   const [selectedDate, setSelectedDate] = useState(today);
@@ -112,7 +115,12 @@ export default function HistoryScreen() {
         {loading ? <ActivityIndicator /> : null}
 
         <View style={styles.detailCard}>
-          <Text style={styles.detailTitle}>トレーニング内容</Text>
+          <View style={styles.detailHeader}>
+            <Text style={styles.detailTitle}>トレーニング内容</Text>
+            <Pressable style={styles.editButton} onPress={() => router.push(`/history/${selectedDate}/edit`)}>
+              <Text style={styles.editButtonText}>Edit</Text>
+            </Pressable>
+          </View>
           {detailLoading ? (
             <ActivityIndicator />
           ) : detail ? (
@@ -172,9 +180,25 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
+  detailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
   detailTitle: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  editButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#111',
+  },
+  editButtonText: {
+    fontWeight: '600',
   },
   detailSection: {
     borderRadius: 12,
