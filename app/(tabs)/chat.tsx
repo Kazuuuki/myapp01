@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
+  ImageSourcePropType,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,11 +18,12 @@ import {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import * as ImagePicker from 'expo-image-picker';
 
 type Attachment = {
   id: string;
   kind: 'image';
-  source: number;
+  source: ImageSourcePropType;
   label: string;
 };
 
@@ -48,7 +51,7 @@ export default function ChatScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const [input, setInput] = useState('');
-  const [pendingAttachment, setPendingAttachment] = useState<Attachment | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [messages, setMessages] = useState<Message[]>(() => [
     {
       id: makeId(),
@@ -92,21 +95,34 @@ export default function ChatScreen() {
   }, []);
 
   const handleAttach = () => {
-    if (pendingAttachment) {
-      setPendingAttachment(null);
-      return;
-    }
-    setPendingAttachment({
-      id: makeId(),
-      kind: 'image',
-      source: SAMPLE_IMAGE,
-      label: 'Form photo',
-    });
+    (async () => {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission required', 'Allow photo library access to attach images.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        selectionLimit: 0,
+        quality: 1,
+      });
+      if (result.canceled || result.assets.length === 0) {
+        return;
+      }
+      const next = result.assets.map((asset) => ({
+        id: makeId(),
+        kind: 'image' as const,
+        source: { uri: asset.uri },
+        label: asset.fileName ?? 'Form photo',
+      }));
+      setPendingAttachments((prev) => [...prev, ...next]);
+    })();
   };
 
   const sendDisabled = useMemo(() => {
-    return input.trim().length === 0 && !pendingAttachment;
-  }, [input, pendingAttachment]);
+    return input.trim().length === 0 && pendingAttachments.length === 0;
+  }, [input, pendingAttachments.length]);
 
   const pushBotReply = () => {
     const nextText = BOT_REPLIES[replyIndex.current % BOT_REPLIES.length];
@@ -148,11 +164,11 @@ export default function ChatScreen() {
       role: 'user',
       text: text.length > 0 ? text : 'Photo attached.',
       status: 'sending',
-      attachments: pendingAttachment ? [pendingAttachment] : undefined,
+      attachments: pendingAttachments.length ? pendingAttachments : undefined,
     };
     setMessages((prev) => [...prev, nextMessage]);
     setInput('');
-    setPendingAttachment(null);
+    setPendingAttachments([]);
     simulateSend(nextMessage.id);
   };
 
@@ -230,17 +246,32 @@ export default function ChatScreen() {
           onLayout={() => listRef.current?.scrollToEnd({ animated: false })}
         />
 
-        {pendingAttachment ? (
+        {pendingAttachments.length ? (
           <View style={[styles.pendingAttachment, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-            <Image source={pendingAttachment.source} style={styles.pendingImage} />
-            <View style={styles.pendingTextWrap}>
-              <Text style={[styles.pendingTitle, { color: colors.text }]}>{pendingAttachment.label}</Text>
-              <Text style={[styles.pendingSubtitle, { color: colors.mutedText }]}>Ready to send</Text>
+            <View style={styles.pendingList}>
+              {pendingAttachments.map((attachment) => (
+                <View key={attachment.id} style={styles.pendingItem}>
+                  <Image source={attachment.source} style={styles.pendingImage} />
+                  <View style={styles.pendingTextWrap}>
+                    <Text style={[styles.pendingTitle, { color: colors.text }]} numberOfLines={1}>
+                      {attachment.label}
+                    </Text>
+                    <Text style={[styles.pendingSubtitle, { color: colors.mutedText }]}>Ready to send</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.removeButton, { borderColor: colors.border }]}
+                    onPress={() =>
+                      setPendingAttachments((prev) => prev.filter((item) => item.id !== attachment.id))
+                    }>
+                    <Text style={[styles.removeButtonText, { color: colors.text }]}>Remove</Text>
+                  </Pressable>
+                </View>
+              ))}
             </View>
             <Pressable
               style={[styles.removeButton, { borderColor: colors.border }]}
-              onPress={() => setPendingAttachment(null)}>
-              <Text style={[styles.removeButtonText, { color: colors.text }]}>Remove</Text>
+              onPress={() => setPendingAttachments([])}>
+              <Text style={[styles.removeButtonText, { color: colors.text }]}>Clear all</Text>
             </Pressable>
           </View>
         ) : null}
@@ -364,13 +395,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   pendingAttachment: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: 10,
     marginHorizontal: 16,
     marginBottom: 8,
     padding: 10,
     borderRadius: 14,
     borderWidth: 1,
+  },
+  pendingList: {
+    gap: 10,
+  },
+  pendingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   pendingImage: {
