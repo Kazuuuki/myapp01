@@ -48,18 +48,19 @@ function buildHistory(messages: MessageView[], limit = 10, excludeId?: string): 
   return filtered.slice(filtered.length - limit);
 }
 
-function buildRequestText(userText: string, profileBlock?: string): string {
-  if (!profileBlock) {
-    return userText;
+function buildRequestText(userText: string): string {
+  return userText;
+}
+
+function buildProfileSystemExtra(profileBlock?: string): string | undefined {
+  const normalized = profileBlock?.trim();
+  if (!normalized) {
+    return undefined;
   }
   return [
     '<<USER_PROFILE>>',
-    profileBlock,
+    normalized,
     '<</USER_PROFILE>>',
-    '',
-    '<<USER_MESSAGE>>',
-    userText,
-    '<</USER_MESSAGE>>',
     '',
     '上のプロフィールを踏まえて回答してください。必要ならプロフィール内の数値（例: 身長）をそのまま引用してください。',
   ].join('\n');
@@ -188,11 +189,7 @@ export default function ChatThreadScreen() {
     }
     const history = buildHistory(messages, 10);
 
-    const proceed = async (userText: string) => {
-      if (!userText.includes('<<USER_PROFILE>>')) {
-        router.push('/profile');
-        return;
-      }
+    const proceed = async (userText: string, profileBlock?: string) => {
       const now = new Date().toISOString();
       const userMessage = await addThreadMessage(String(threadId), 'user', text, now);
       await touchChatThread(String(threadId), now);
@@ -206,7 +203,7 @@ export default function ChatThreadScreen() {
         setThread((prev) => (prev ? { ...prev, title: nextTitle, updatedAt: now } : prev));
       }
 
-      sendToApi(userMessage.id, userText, history);
+      sendToApi(userMessage.id, userText, history, buildProfileSystemExtra(profileBlock));
     };
 
     const profile = await getUserProfile();
@@ -217,14 +214,14 @@ export default function ChatThreadScreen() {
         'プロフィールを入力するとアドバイスがより良くなります。いま送信しますか？',
         [
           { text: '入力する', onPress: () => router.push('/profile') },
-          { text: '送信する', onPress: () => proceed(text) },
+          { text: '送信する', onPress: () => proceed(buildRequestText(text)) },
           { text: 'キャンセル', style: 'cancel' },
         ],
       );
       return;
     }
 
-    await proceed(buildRequestText(text, formatted));
+    await proceed(buildRequestText(text), formatted);
   };
 
   const handleRetry = (id: string) => {
@@ -242,7 +239,7 @@ export default function ChatThreadScreen() {
         }
         return formatted;
       })
-      .then((profileBlock) => sendToApi(id, buildRequestText(message.text, profileBlock), history))
+      .then((profileBlock) => sendToApi(id, buildRequestText(message.text), history, buildProfileSystemExtra(profileBlock)))
       .catch(() => {
         Alert.alert('Profile required', 'Please set up your profile before sending.', [
           { text: 'Edit profile', onPress: () => router.push('/profile') },

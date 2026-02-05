@@ -64,6 +64,16 @@ export const schemaStatements = [
     weight_kg REAL,
     updated_at TEXT NOT NULL
   );`,
+  `CREATE TABLE IF NOT EXISTS ai_logs (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    date TEXT,
+    request_text TEXT NOT NULL,
+    response_text TEXT,
+    parsed_json TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL
+  );`,
   `CREATE INDEX IF NOT EXISTS idx_set_records_session_exercise ON set_records(session_id, exercise_id);`,
   `CREATE INDEX IF NOT EXISTS idx_session_exercises_session_position ON session_exercises(session_id, position);`,
   `CREATE INDEX IF NOT EXISTS idx_workout_sessions_date ON workout_sessions(date);`,
@@ -72,4 +82,5 @@ export const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_created ON chat_messages(thread_id, created_at);`,
   `CREATE INDEX IF NOT EXISTS idx_chat_threads_updated_at ON chat_threads(updated_at);`,
   `CREATE INDEX IF NOT EXISTS idx_user_profile_updated_at ON user_profile(updated_at);`,
+  `CREATE INDEX IF NOT EXISTS idx_ai_logs_kind_created ON ai_logs(kind, created_at);`,
 ];

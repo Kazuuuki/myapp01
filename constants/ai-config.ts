@@ -1,5 +1,6 @@
 export const AI_API_BASE_URL = 'https://j81fg03kb7.execute-api.ap-northeast-1.amazonaws.com';
 export const AI_CHAT_ENDPOINT = `${AI_API_BASE_URL}/ai/chat`;
+export const AI_TODAY_MENU_ENDPOINT = `${AI_API_BASE_URL}/ai/today-menu`;
 
 export const AI_CHAT_SYSTEM_PROMPT = `あなたは筋トレの安全なフォーム改善とトレーニング提案を行うアシスタントです。
 以下のルールを必ず守ってください。
@@ -41,12 +42,17 @@ export type AiChatHistoryItem = {
 };
 
 export type BuildAiChatRequestOptions = {
+  systemOverride?: string;
   systemExtra?: string;
   outputFormat?: AiChatRequest['outputFormat'];
 };
 
-function buildSystemPrompt(extra?: string): string {
-  const normalized = extra?.trim();
+function buildSystemPrompt(options?: BuildAiChatRequestOptions): string {
+  const override = options?.systemOverride?.trim();
+  if (override) {
+    return override;
+  }
+  const normalized = options?.systemExtra?.trim();
   if (!normalized) {
     return AI_CHAT_SYSTEM_PROMPT;
   }
@@ -58,7 +64,7 @@ export function buildAiChatRequest(
   history?: AiChatHistoryItem[],
   options?: BuildAiChatRequestOptions,
 ): AiChatRequest {
-  const system = buildSystemPrompt(options?.systemExtra);
+  const system = buildSystemPrompt(options);
   const outputFormat: AiChatRequest['outputFormat'] = options?.outputFormat ?? 'markdown';
   if (history && history.length > 0) {
     return { text, history, system, outputFormat };
