@@ -11,7 +11,6 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -23,7 +22,6 @@ import { AI_CHAT_ENDPOINT, AiChatHistoryItem, buildAiChatRequest } from '@/const
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ChatMessage, ChatThread } from '@/src/models/types';
-import { useChatProfileAttachmentPreference } from '@/src/state/chatPreferences';
 import {
   DEFAULT_CHAT_TITLE,
   addThreadMessage,
@@ -77,7 +75,6 @@ export default function ChatThreadScreen() {
   const [messages, setMessages] = useState<MessageView[]>([]);
   const [loading, setLoading] = useState(true);
   const listRef = useRef<FlatList<MessageView>>(null);
-  const { includeProfile, setIncludeProfile } = useChatProfileAttachmentPreference();
   const [debugPayloadJson, setDebugPayloadJson] = useState<string | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
 
@@ -145,7 +142,7 @@ export default function ChatThreadScreen() {
     if (__DEV__) {
       setDebugPayloadJson(payloadJson);
       const hasProfile =
-        (payload.system?.includes('# Profile') ?? false) || (payload.text?.includes('<<USER_PROFILE>>') ?? false);
+        payload.text?.includes('<<USER_PROFILE>>') ?? false;
       console.log('[ai/chat] request payload', { hasProfile, payload });
     }
     try {
@@ -191,7 +188,11 @@ export default function ChatThreadScreen() {
     }
     const history = buildHistory(messages, 10);
 
-    const proceed = async (userText: string, systemExtra?: string) => {
+    const proceed = async (userText: string) => {
+      if (!userText.includes('<<USER_PROFILE>>')) {
+        router.push('/profile');
+        return;
+      }
       const now = new Date().toISOString();
       const userMessage = await addThreadMessage(String(threadId), 'user', text, now);
       await touchChatThread(String(threadId), now);
@@ -205,13 +206,8 @@ export default function ChatThreadScreen() {
         setThread((prev) => (prev ? { ...prev, title: nextTitle, updatedAt: now } : prev));
       }
 
-      sendToApi(userMessage.id, userText, history, systemExtra);
+      sendToApi(userMessage.id, userText, history);
     };
-
-    if (!includeProfile) {
-      await proceed(text);
-      return;
-    }
 
     const profile = await getUserProfile();
     const formatted = profile ? formatUserProfileForPrompt(profile) : '';
@@ -228,7 +224,7 @@ export default function ChatThreadScreen() {
       return;
     }
 
-    await proceed(buildRequestText(text, formatted), formatted);
+    await proceed(buildRequestText(text, formatted));
   };
 
   const handleRetry = (id: string) => {
@@ -238,17 +234,22 @@ export default function ChatThreadScreen() {
     }
     markMessageStatus(id, 'sending');
     const history = buildHistory(messages, 10, id);
-    if (!includeProfile) {
-      sendToApi(id, message.text, history);
-      return;
-    }
     getUserProfile()
       .then((profile) => {
         const formatted = profile ? formatUserProfileForPrompt(profile) : '';
-        return formatted ? formatted : undefined;
+        if (!formatted) {
+          throw new Error('Profile required');
+        }
+        return formatted;
       })
-      .then((systemExtra) => sendToApi(id, buildRequestText(message.text, systemExtra), history, systemExtra))
-      .catch(() => sendToApi(id, message.text, history));
+      .then((profileBlock) => sendToApi(id, buildRequestText(message.text, profileBlock), history))
+      .catch(() => {
+        Alert.alert('Profile required', 'Please set up your profile before sending.', [
+          { text: 'Edit profile', onPress: () => router.push('/profile') },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+        markMessageStatus(id, 'failed');
+      });
   };
 
   const renderMessage = ({ item }: { item: MessageView }) => {
@@ -349,12 +350,6 @@ export default function ChatThreadScreen() {
               </Pressable>
             ) : null}
           </View>
-          <Switch
-            value={includeProfile}
-            onValueChange={setIncludeProfile}
-            trackColor={{ false: colors.secondary, true: colors.primary }}
-            thumbColor={Platform.OS === 'android' ? (includeProfile ? colors.primaryText : colors.mutedText) : undefined}
-          />
         </View>
 
         <View style={[styles.composer, { backgroundColor: colors.card, borderColor: colors.border }]}> 
