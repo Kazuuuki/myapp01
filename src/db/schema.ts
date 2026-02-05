@@ -50,6 +50,20 @@ export const schemaStatements = [
     created_at TEXT NOT NULL,
     FOREIGN KEY (thread_id) REFERENCES chat_threads(id) ON DELETE CASCADE
   );`,
+  `CREATE TABLE IF NOT EXISTS user_profile (
+    id TEXT PRIMARY KEY,
+    goal TEXT,
+    frequency_per_week INTEGER,
+    session_duration_min INTEGER,
+    equipment TEXT,
+    injury_or_pain TEXT,
+    experience_level TEXT,
+    age INTEGER,
+    sex TEXT,
+    height_cm REAL,
+    weight_kg REAL,
+    updated_at TEXT NOT NULL
+  );`,
   `CREATE INDEX IF NOT EXISTS idx_set_records_session_exercise ON set_records(session_id, exercise_id);`,
   `CREATE INDEX IF NOT EXISTS idx_session_exercises_session_position ON session_exercises(session_id, position);`,
   `CREATE INDEX IF NOT EXISTS idx_workout_sessions_date ON workout_sessions(date);`,
@@ -57,4 +71,5 @@ export const schemaStatements = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_exercises_name_body_part ON exercises(name, body_part);`,
   `CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_created ON chat_messages(thread_id, created_at);`,
   `CREATE INDEX IF NOT EXISTS idx_chat_threads_updated_at ON chat_threads(updated_at);`,
+  `CREATE INDEX IF NOT EXISTS idx_user_profile_updated_at ON user_profile(updated_at);`,
 ];

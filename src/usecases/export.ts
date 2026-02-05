@@ -1,5 +1,6 @@
 import { queryAll } from '@/src/db/client';
 import { Exercise, SessionExercise, SetRecord, WorkoutSession } from '@/src/models/types';
+import { getUserProfile } from '@/src/usecases/userProfile';
 
 function parseImageUris(value: string | null): string[] {
   if (!value) {
@@ -17,6 +18,7 @@ function parseImageUris(value: string | null): string[] {
 }
 
 export async function exportAllToJson(): Promise<string> {
+  const profile = await getUserProfile();
   const sessions = await queryAll<WorkoutSession>(
     `SELECT id, date, start_time as startTime FROM workout_sessions ORDER BY date ASC;`,
   );
@@ -44,6 +46,7 @@ export async function exportAllToJson(): Promise<string> {
 
   const payload = {
     exportedAt: new Date().toISOString(),
+    profile,
     sessions,
     exercises,
     sessionExercises,

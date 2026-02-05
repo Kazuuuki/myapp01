@@ -40,8 +40,24 @@ export type AiChatHistoryItem = {
   text: string;
 };
 
-export function buildAiChatRequest(text: string, history?: AiChatHistoryItem[]): AiChatRequest {
-  const system = AI_CHAT_SYSTEM_PROMPT;
+export type BuildAiChatRequestOptions = {
+  systemExtra?: string;
+};
+
+function buildSystemPrompt(extra?: string): string {
+  const normalized = extra?.trim();
+  if (!normalized) {
+    return AI_CHAT_SYSTEM_PROMPT;
+  }
+  return `${AI_CHAT_SYSTEM_PROMPT}\n\n${normalized}`;
+}
+
+export function buildAiChatRequest(
+  text: string,
+  history?: AiChatHistoryItem[],
+  options?: BuildAiChatRequestOptions,
+): AiChatRequest {
+  const system = buildSystemPrompt(options?.systemExtra);
   const outputFormat: AiChatRequest['outputFormat'] = 'markdown';
   if (history && history.length > 0) {
     return { text, history, system, outputFormat };

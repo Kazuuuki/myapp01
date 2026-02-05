@@ -44,6 +44,9 @@ export async function getRecentSessions(limit: number): Promise<WorkoutSession[]
 }
 
 export async function deleteAll(): Promise<void> {
+  await executeSql('DELETE FROM user_profile;');
+  await executeSql('DELETE FROM chat_messages;');
+  await executeSql('DELETE FROM chat_threads;');
   await executeSql('DELETE FROM set_records;');
   await executeSql('DELETE FROM session_exercises;');
   await executeSql('DELETE FROM exercises;');

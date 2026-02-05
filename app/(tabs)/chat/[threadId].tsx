@@ -4,9 +4,12 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -29,6 +32,7 @@ import {
   touchChatThread,
   updateChatThreadTitle,
 } from '@/src/usecases/chat';
+import { formatUserProfileForPrompt, getUserProfile } from '@/src/usecases/userProfile';
 
 type MessageView = ChatMessage & {
   status?: 'sending' | 'sent' | 'failed';
@@ -44,6 +48,23 @@ function buildHistory(messages: MessageView[], limit = 10, excludeId?: string): 
   return filtered.slice(filtered.length - limit);
 }
 
+function buildRequestText(userText: string, profileBlock?: string): string {
+  if (!profileBlock) {
+    return userText;
+  }
+  return [
+    '<<USER_PROFILE>>',
+    profileBlock,
+    '<</USER_PROFILE>>',
+    '',
+    '<<USER_MESSAGE>>',
+    userText,
+    '<</USER_MESSAGE>>',
+    '',
+    '上のプロフィールを踏まえて回答してください。必要ならプロフィール内の数値（例: 身長）をそのまま引用してください。',
+  ].join('\n');
+}
+
 export default function ChatThreadScreen() {
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
   const router = useRouter();
@@ -54,6 +75,8 @@ export default function ChatThreadScreen() {
   const [messages, setMessages] = useState<MessageView[]>([]);
   const [loading, setLoading] = useState(true);
   const listRef = useRef<FlatList<MessageView>>(null);
+  const [debugPayloadJson, setDebugPayloadJson] = useState<string | null>(null);
+  const [debugOpen, setDebugOpen] = useState(false);
 
   const loadThread = useCallback(async () => {
     if (!threadId) {
@@ -74,17 +97,17 @@ export default function ChatThreadScreen() {
   }, [loadThread]);
 
   const handleAttach = () => {
-    Alert.alert('Images coming soon', 'Image upload is not available yet. Please send text for now.');
+    Alert.alert('画像添付は準備中', '画像添付はまだ利用できません。テキストを送ってください。');
   };
 
   const handleDeleteThread = () => {
     if (!threadId) {
       return;
     }
-    Alert.alert('Delete chat?', 'This will remove the entire conversation.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert('チャットを削除しますか？', 'この会話のメッセージがすべて削除されます。', [
+      { text: 'キャンセル', style: 'cancel' },
       {
-        text: 'Delete',
+        text: '削除',
         style: 'destructive',
         onPress: async () => {
           await deleteChatThread(String(threadId));
@@ -104,13 +127,24 @@ export default function ChatThreadScreen() {
     );
   };
 
-  const sendToApi = async (id: string, text: string, history: AiChatHistoryItem[]) => {
+  const sendToApi = async (
+    id: string,
+    text: string,
+    history: AiChatHistoryItem[],
+    systemExtra?: string,
+  ) => {
     if (!threadId) {
       markMessageStatus(id, 'failed');
       return;
     }
-    const payload = buildAiChatRequest(text, history);
+    const payload = buildAiChatRequest(text, history, { systemExtra });
     const payloadJson = JSON.stringify(payload);
+    if (__DEV__) {
+      setDebugPayloadJson(payloadJson);
+      const hasProfile =
+        payload.text?.includes('<<USER_PROFILE>>') ?? false;
+      console.log('[ai/chat] request payload', { hasProfile, payload });
+    }
     try {
       const response = await fetch(AI_CHAT_ENDPOINT, {
         method: 'POST',
@@ -129,6 +163,9 @@ export default function ChatThreadScreen() {
       const reply = data.text?.trim();
       if (!reply) {
         throw new Error('Empty response');
+      }
+      if (__DEV__) {
+        console.log('[ai/chat] response', { requestId: id, reply });
       }
       const now = new Date().toISOString();
       const botMessage = await addThreadMessage(String(threadId), 'bot', reply, now);
@@ -150,20 +187,44 @@ export default function ChatThreadScreen() {
       return;
     }
     const history = buildHistory(messages, 10);
-    const now = new Date().toISOString();
-    const userMessage = await addThreadMessage(String(threadId), 'user', text, now);
-    await touchChatThread(String(threadId), now);
 
-    setMessages((prev) => [...prev, { ...userMessage, status: 'sending' }]);
-    setInput('');
+    const proceed = async (userText: string) => {
+      if (!userText.includes('<<USER_PROFILE>>')) {
+        router.push('/profile');
+        return;
+      }
+      const now = new Date().toISOString();
+      const userMessage = await addThreadMessage(String(threadId), 'user', text, now);
+      await touchChatThread(String(threadId), now);
 
-    if (thread && thread.title === DEFAULT_CHAT_TITLE) {
-      const nextTitle = deriveThreadTitle(text);
-      await updateChatThreadTitle(String(threadId), nextTitle, now);
-      setThread((prev) => (prev ? { ...prev, title: nextTitle, updatedAt: now } : prev));
+      setMessages((prev) => [...prev, { ...userMessage, status: 'sending' }]);
+      setInput('');
+
+      if (thread && thread.title === DEFAULT_CHAT_TITLE) {
+        const nextTitle = deriveThreadTitle(text);
+        await updateChatThreadTitle(String(threadId), nextTitle, now);
+        setThread((prev) => (prev ? { ...prev, title: nextTitle, updatedAt: now } : prev));
+      }
+
+      sendToApi(userMessage.id, userText, history);
+    };
+
+    const profile = await getUserProfile();
+    const formatted = profile ? formatUserProfileForPrompt(profile) : '';
+    if (!formatted) {
+      Alert.alert(
+        'プロフィールが未入力です',
+        'プロフィールを入力するとアドバイスがより良くなります。いま送信しますか？',
+        [
+          { text: '入力する', onPress: () => router.push('/profile') },
+          { text: '送信する', onPress: () => proceed(text) },
+          { text: 'キャンセル', style: 'cancel' },
+        ],
+      );
+      return;
     }
 
-    sendToApi(userMessage.id, text, history);
+    await proceed(buildRequestText(text, formatted));
   };
 
   const handleRetry = (id: string) => {
@@ -173,7 +234,22 @@ export default function ChatThreadScreen() {
     }
     markMessageStatus(id, 'sending');
     const history = buildHistory(messages, 10, id);
-    sendToApi(id, message.text, history);
+    getUserProfile()
+      .then((profile) => {
+        const formatted = profile ? formatUserProfileForPrompt(profile) : '';
+        if (!formatted) {
+          throw new Error('Profile required');
+        }
+        return formatted;
+      })
+      .then((profileBlock) => sendToApi(id, buildRequestText(message.text, profileBlock), history))
+      .catch(() => {
+        Alert.alert('Profile required', 'Please set up your profile before sending.', [
+          { text: 'Edit profile', onPress: () => router.push('/profile') },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+        markMessageStatus(id, 'failed');
+      });
   };
 
   const renderMessage = ({ item }: { item: MessageView }) => {
@@ -197,11 +273,11 @@ export default function ChatThreadScreen() {
           {item.status === 'sending' ? (
             <View style={styles.statusRow}>
               <ActivityIndicator size="small" color={colors.mutedText} />
-              <Text style={[styles.statusText, { color: colors.mutedText }]}>Sending...</Text>
+              <Text style={[styles.statusText, { color: colors.mutedText }]}>送信中…</Text>
             </View>
           ) : item.status === 'failed' ? (
             <Pressable onPress={() => handleRetry(item.id)}>
-              <Text style={[styles.statusText, { color: colors.dangerText }]}>Failed. Tap to retry.</Text>
+              <Text style={[styles.statusText, { color: colors.dangerText }]}>送信に失敗しました。タップで再送。</Text>
             </Pressable>
           ) : null}
         </View>
@@ -224,9 +300,9 @@ export default function ChatThreadScreen() {
           </Pressable>
           <View style={styles.headerText}>
             <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-              {thread?.title ?? 'Chat'}
+              {thread?.title ?? 'チャット'}
             </Text>
-            <Text style={[styles.subtitle, { color: colors.mutedText }]}>Ask about training or attach a form photo.</Text>
+            <Text style={[styles.subtitle, { color: colors.mutedText }]}>トレーニングについて質問できます。</Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -250,11 +326,31 @@ export default function ChatThreadScreen() {
               <ActivityIndicator style={{ marginTop: 24 }} />
             ) : (
               <View style={styles.emptyState}>
-                <Text style={[styles.emptyText, { color: colors.mutedText }]}>No messages yet.</Text>
+                <Text style={[styles.emptyText, { color: colors.mutedText }]}>まだメッセージはありません。</Text>
               </View>
             )
           }
         />
+
+        <View style={styles.optionsRow}>
+          <View style={styles.optionsLeft}>
+            <Text style={[styles.optionsLabel, { color: colors.mutedText }]}>プロフィールを付与</Text>
+            <Pressable onPress={() => router.push('/profile')}>
+              <Text style={[styles.optionsLink, { color: colors.mutedText }]}>編集</Text>
+            </Pressable>
+            {__DEV__ ? (
+              <Pressable onPress={() => setDebugOpen(true)} disabled={!debugPayloadJson}>
+                <Text
+                  style={[
+                    styles.optionsLink,
+                    { color: debugPayloadJson ? colors.mutedText : colors.subtleText },
+                  ]}>
+                  送信内容
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
 
         <View style={[styles.composer, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <Pressable style={styles.iconButton} onPress={handleAttach}>
@@ -263,7 +359,7 @@ export default function ChatThreadScreen() {
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Type a message"
+            placeholder="メッセージを入力"
             placeholderTextColor={colors.mutedText}
             style={[styles.input, { color: colors.text }]}
             multiline
@@ -282,7 +378,49 @@ export default function ChatThreadScreen() {
             />
           </Pressable>
         </View>
-        <Text style={[styles.helperText, { color: colors.mutedText }]}>Image uploads are not available yet. Text chat only for now.</Text>
+        <Text style={[styles.helperText, { color: colors.mutedText }]}>
+          画像添付は準備中です。テキストのみ送信できます。
+        </Text>
+
+        {__DEV__ ? (
+          <Modal transparent visible={debugOpen} animationType="fade" onRequestClose={() => setDebugOpen(false)}>
+            <View style={[styles.debugBackdrop, { backgroundColor: colors.overlay }]}>
+              <View style={[styles.debugCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.debugHeader}>
+                  <Text style={[styles.debugTitle, { color: colors.text }]}>送信内容（デバッグ）</Text>
+                  <Pressable
+                    style={[styles.debugClose, { borderColor: colors.inputBorder }]}
+                    onPress={() => setDebugOpen(false)}>
+                    <Text style={[styles.debugCloseText, { color: colors.text }]}>閉じる</Text>
+                  </Pressable>
+                </View>
+
+                <ScrollView style={styles.debugScroll} contentContainerStyle={styles.debugScrollContent}>
+                  <Text style={[styles.debugNote, { color: colors.mutedText }]}>
+                    直近のリクエストJSONを表示します。profileが付与されている場合、system内に「# Profile」が含まれます。
+                  </Text>
+                  <Text style={[styles.debugJson, { color: colors.text }]} selectable>
+                    {debugPayloadJson ?? '（まだ送信していません）'}
+                  </Text>
+                </ScrollView>
+
+                <Pressable
+                  style={[styles.debugShare, { borderColor: colors.inputBorder }]}
+                  onPress={() => {
+                    if (!debugPayloadJson) {
+                      return;
+                    }
+                    Share.share({ message: debugPayloadJson }).catch(() => undefined);
+                  }}
+                  disabled={!debugPayloadJson}>
+                  <Text style={[styles.debugShareText, { color: colors.text }]}>
+                    {debugPayloadJson ? '共有して確認' : '送信後に表示できます'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
+        ) : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -396,6 +534,87 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
+  },
+  optionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  optionsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  optionsLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  optionsLink: {
+    fontSize: 12,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  debugBackdrop: {
+    flex: 1,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  debugCard: {
+    width: '100%',
+    maxWidth: 760,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+    maxHeight: '80%',
+  },
+  debugHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  debugTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  debugClose: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  debugCloseText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  debugScroll: {
+    flex: 1,
+  },
+  debugScrollContent: {
+    gap: 10,
+    paddingBottom: 10,
+  },
+  debugNote: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  debugJson: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  debugShare: {
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  debugShareText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   composer: {
     flexDirection: 'row',

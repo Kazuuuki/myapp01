@@ -104,3 +104,22 @@ export type ChatThreadSummary = ChatThread & {
   lastMessageAt: string | null;
   lastMessageRole: ChatMessageRole | null;
 };
+
+export type UserProfileExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
+
+export type UserProfileSex = 'male' | 'female' | 'other' | 'prefer_not_to_say';
+
+export type UserProfile = {
+  id: string;
+  goal: string | null;
+  frequencyPerWeek: number | null;
+  sessionDurationMin: number | null;
+  equipment: string | null;
+  injuryOrPain: string | null;
+  experienceLevel: UserProfileExperienceLevel | null;
+  age: number | null;
+  sex: UserProfileSex | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  updatedAt: string; // ISO string
+};
