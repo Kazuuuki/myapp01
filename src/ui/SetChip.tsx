@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, AlertButton, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -55,36 +55,36 @@ export function SetChip({ index, set, unit, onUpdate, onDelete }: Props) {
   const handleMenuPress = () => {
     const hasMemo = memoText.trim().length > 0;
 
-    Alert.alert('オプション', undefined, [
-      ...(!hasMemo
-        ? [
-            {
-              text: 'メモを追加',
-              onPress: () => setShowMemo(true),
-            },
-          ]
-        : []),
-      ...(hasMemo
-        ? [
-            {
-              text: 'メモを削除',
-              style: 'destructive',
-              onPress: () => {
-                const weightKg = fromDisplayWeight(weightDisplay, unit);
-                setMemoText('');
-                setShowMemo(false);
-                onUpdate(set.id, weightKg, reps, null);
-              },
-            },
-          ]
-        : []),
-      {
-        text: 'セットを削除',
+    const buttons: AlertButton[] = [];
+
+    if (!hasMemo) {
+      buttons.push({
+        text: 'メモを追加',
+        onPress: () => setShowMemo(true),
+      });
+    }
+
+    if (hasMemo) {
+      buttons.push({
+        text: 'メモを削除',
         style: 'destructive',
-        onPress: () => onDelete(set.id),
-      },
-      { text: 'キャンセル', style: 'cancel' },
-    ]);
+        onPress: () => {
+          const weightKg = fromDisplayWeight(weightDisplay, unit);
+          setMemoText('');
+          setShowMemo(false);
+          onUpdate(set.id, weightKg, reps, null);
+        },
+      });
+    }
+
+    buttons.push({
+      text: 'セットを削除',
+      style: 'destructive',
+      onPress: () => onDelete(set.id),
+    });
+    buttons.push({ text: 'キャンセル', style: 'cancel' });
+
+    Alert.alert('オプション', undefined, buttons);
   };
 
   return (

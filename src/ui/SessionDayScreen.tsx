@@ -22,7 +22,15 @@ import { BodyPart, Exercise } from '@/src/models/types';
 import { useTodaySession } from '@/src/state/todaySession';
 import { useUnitPreference } from '@/src/state/unitPreference';
 import { ExerciseCard } from '@/src/ui/ExerciseCard';
+import {
+  AiTodayMenu,
+  TodayMenuRequestOptions,
+  applyAiTodayMenuToSession,
+  requestAiTodayMenu,
+} from '@/src/usecases/aiTodayMenu';
 import { ensureBodyPart, listBodyParts, listExercisesByBodyPart } from '@/src/usecases/exercises';
+import { removeExerciseFromToday } from '@/src/usecases/today';
+import { getUserProfile } from '@/src/usecases/userProfile';
 
 type Props = {
   date: string;
@@ -37,6 +45,7 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
   const colors = Colors[colorScheme];
   const { unit } = useUnitPreference();
   const {
+    session,
     exercises,
     loading,
     error,
@@ -46,10 +55,12 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
     removeSet,
     pastePreviousSets,
     removeExercise,
+    refresh,
   } = useTodaySession(date);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isAiOpen, setIsAiOpen] = useState(false);
   const [bodyParts, setBodyParts] = useState<BodyPart[]>([]);
   const [exercisesByPart, setExercisesByPart] = useState<Exercise[]>([]);
   const [newBodyPart, setNewBodyPart] = useState('');
@@ -61,12 +72,20 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
 
   const [bodyPartKey, setBodyPartKey] = useState('');
   const [exerciseKey, setExerciseKey] = useState('');
+  const [aiBodyPartKey, setAiBodyPartKey] = useState('');
+  const [aiTimeLimitKey, setAiTimeLimitKey] = useState<string>('45');
+  const [aiGoal, setAiGoal] = useState('');
+  const [aiApplyStrategy, setAiApplyStrategy] = useState<TodayMenuRequestOptions['applyStrategy']>('append');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiMenu, setAiMenu] = useState<AiTodayMenu | null>(null);
 
   const loadBodyParts = useCallback(async () => {
     const parts = await listBodyParts();
     setBodyParts(parts);
     const first = parts[0]?.name ?? '';
     setBodyPartKey((current) => current || first);
+    setAiBodyPartKey((current) => current || first);
   }, []);
 
   const loadExercises = useCallback(async (bodyPartName: string) => {
@@ -128,6 +147,112 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
   const isAddDisabled = !exerciseKey;
   const isCreateDisabled = !newBodyPart.trim() || !newExercise.trim();
 
+  const aiTimeLimitMin = useCallback((): number | undefined => {
+    const parsed = Number(aiTimeLimitKey);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  }, [aiTimeLimitKey]);
+
+  const confirmProceedWithoutProfile = useCallback(async (): Promise<boolean> => {
+    const profile = await getUserProfile();
+    if (profile) {
+      return true;
+    }
+    return new Promise<'edit' | 'generate' | 'cancel'>((resolve) => {
+      Alert.alert(
+        'Profile not set',
+        'AI提案はプロフィールがあると精度が上がります。プロフィールなしで生成しますか？',
+        [
+          { text: 'Edit profile', onPress: () => resolve('edit') },
+          { text: 'Generate', onPress: () => resolve('generate') },
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
+        ],
+      );
+    }).then((choice) => {
+      if (choice === 'edit') {
+        router.push('/profile');
+        return false;
+      }
+      if (choice === 'generate') {
+        return true;
+      }
+      return false;
+    });
+  }, [router]);
+
+  const handleGenerateAiMenu = useCallback(async () => {
+    if (!aiBodyPartKey) {
+      return;
+    }
+    setAiError(null);
+    setAiMenu(null);
+
+    const ok = await confirmProceedWithoutProfile();
+    if (!ok) {
+      return;
+    }
+
+    setAiGenerating(true);
+    try {
+      const menu = await requestAiTodayMenu(date, {
+        selectedBodyPart: aiBodyPartKey,
+        timeLimitMin: aiTimeLimitMin(),
+        todayGoal: aiGoal.trim() ? aiGoal.trim() : undefined,
+        applyStrategy: aiApplyStrategy,
+      });
+      setAiMenu(menu);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : 'Failed to generate menu');
+    } finally {
+      setAiGenerating(false);
+    }
+  }, [aiApplyStrategy, aiBodyPartKey, aiGoal, aiTimeLimitMin, confirmProceedWithoutProfile, date]);
+
+  const handleApplyAiMenu = useCallback(async () => {
+    if (!session || !aiMenu) {
+      return;
+    }
+
+    setAiError(null);
+
+    if (aiApplyStrategy === 'replace' && exercises.length > 0) {
+      const confirmed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          'Replace today exercises?',
+          'This will remove all exercises and sets for today before adding the AI menu.',
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Replace', style: 'destructive', onPress: () => resolve(true) },
+          ],
+        );
+      });
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setAiGenerating(true);
+
+    try {
+      if (aiApplyStrategy === 'replace' && exercises.length > 0) {
+        for (const item of exercises) {
+          await removeExerciseFromToday(session.id, item.exercise.id);
+        }
+      }
+      await applyAiTodayMenuToSession(session.id, aiMenu);
+      Alert.alert('Added', 'AI menu was added to today.');
+      setIsAiOpen(false);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : 'Failed to apply menu');
+    } finally {
+      setAiGenerating(false);
+      try {
+        await refresh();
+      } catch {
+        // ignore
+      }
+    }
+  }, [aiApplyStrategy, aiMenu, exercises, refresh, session]);
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
@@ -148,6 +273,16 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
 
         <Pressable style={[styles.addTrigger, { backgroundColor: colors.primary }]} onPress={() => setIsAddOpen(true)}>
           <Text style={[styles.addTriggerText, { color: colors.primaryText }]}>Add Exercise</Text>
+        </Pressable>
+
+        <Pressable
+          style={[styles.secondaryTrigger, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => {
+            setAiError(null);
+            setAiMenu(null);
+            setIsAiOpen(true);
+          }}>
+          <Text style={[styles.addTriggerText, { color: colors.text }]}>AI提案</Text>
         </Pressable>
 
         {loading ? <ActivityIndicator /> : null}
@@ -269,6 +404,116 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      <Modal transparent visible={isAiOpen} animationType="slide" onRequestClose={() => setIsAiOpen(false)}>
+        <View style={[styles.modalBackdrop, { backgroundColor: colors.overlay }]}>
+          <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>AI提案</Text>
+                <Pressable style={[styles.modalClose, { borderColor: colors.primary }]} onPress={() => setIsAiOpen(false)}>
+                  <Text style={[styles.modalCloseText, { color: colors.text }]}>Close</Text>
+                </Pressable>
+              </View>
+
+              <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Body Part</Text>
+              <View style={[styles.pickerWrapper, { backgroundColor: pickerBackground, borderColor: pickerBorder }]}>
+                <Picker
+                  selectedValue={aiBodyPartKey}
+                  onValueChange={(value) => setAiBodyPartKey(String(value))}
+                  style={[styles.picker, { color: pickerTextColor }]}
+                  itemStyle={[styles.pickerItem, { color: pickerTextColor }]}
+                  dropdownIconColor={pickerTextColor}>
+                  {bodyParts.map((part) => (
+                    <Picker.Item key={part.id} label={part.name} value={part.name} color={pickerTextColor} />
+                  ))}
+                </Picker>
+              </View>
+
+              <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Time Limit</Text>
+              <View style={[styles.smallPickerWrapper, { backgroundColor: pickerBackground, borderColor: pickerBorder }]}>
+                <Picker
+                  selectedValue={aiTimeLimitKey}
+                  onValueChange={(value) => setAiTimeLimitKey(String(value))}
+                  style={[styles.smallPicker, { color: pickerTextColor }]}
+                  itemStyle={[styles.smallPickerItem, { color: pickerTextColor }]}
+                  dropdownIconColor={pickerTextColor}>
+                  <Picker.Item label="30 min" value="30" color={pickerTextColor} />
+                  <Picker.Item label="45 min" value="45" color={pickerTextColor} />
+                  <Picker.Item label="60 min" value="60" color={pickerTextColor} />
+                </Picker>
+              </View>
+
+              <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Goal (optional)</Text>
+              <TextInput
+                value={aiGoal}
+                onChangeText={setAiGoal}
+                placeholder="例: 筋肥大 / 強度 / 軽め / フォーム"
+                style={[styles.textInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
+                placeholderTextColor={colors.mutedText}
+              />
+
+              <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Add Strategy</Text>
+              <View style={[styles.smallPickerWrapper, { backgroundColor: pickerBackground, borderColor: pickerBorder }]}>
+                <Picker
+                  selectedValue={aiApplyStrategy}
+                  onValueChange={(value) => setAiApplyStrategy(String(value) as TodayMenuRequestOptions['applyStrategy'])}
+                  style={[styles.smallPicker, { color: pickerTextColor }]}
+                  itemStyle={[styles.smallPickerItem, { color: pickerTextColor }]}
+                  dropdownIconColor={pickerTextColor}>
+                  <Picker.Item label="Append" value="append" color={pickerTextColor} />
+                  <Picker.Item label="Replace" value="replace" color={pickerTextColor} />
+                </Picker>
+              </View>
+
+              {aiError ? <Text style={[styles.error, { color: colors.dangerText }]}>{aiError}</Text> : null}
+              {aiGenerating ? <ActivityIndicator /> : null}
+
+              <Pressable
+                style={[styles.addButton, { backgroundColor: colors.primary }, aiGenerating && { backgroundColor: colors.disabled }]}
+                onPress={handleGenerateAiMenu}
+                disabled={aiGenerating}>
+                <Text style={[styles.addButtonText, { color: colors.primaryText }]}>Generate</Text>
+              </Pressable>
+
+              {aiMenu ? (
+                <View style={[styles.aiPreviewCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                  {aiMenu.title ? <Text style={[styles.aiTitle, { color: colors.text }]}>{aiMenu.title}</Text> : null}
+
+                  {aiMenu.warnings?.length ? (
+                    <View style={styles.aiSection}>
+                      {aiMenu.warnings.slice(0, 6).map((w, idx) => (
+                        <Text key={`${idx}-${w}`} style={[styles.aiMuted, { color: colors.dangerText }]}>
+                          • {w}
+                        </Text>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  <View style={styles.aiSection}>
+                    {aiMenu.items.map((it, idx) => (
+                      <View key={`${idx}-${it.exerciseName}`} style={styles.aiItem}>
+                        <Text style={[styles.aiItemTitle, { color: colors.text }]}>{it.exerciseName}</Text>
+                        <Text style={[styles.aiMuted, { color: colors.mutedText }]}>
+                          sets: {it.sets.map((s) => s.reps).join(', ')}
+                        </Text>
+                        {it.note ? <Text style={[styles.aiMuted, { color: colors.mutedText }]}>{it.note}</Text> : null}
+                      </View>
+                    ))}
+                  </View>
+
+                  <Pressable
+                    style={[styles.addButton, { backgroundColor: colors.primary }, aiGenerating && { backgroundColor: colors.disabled }]}
+                    onPress={handleApplyAiMenu}
+                    disabled={aiGenerating}>
+                    <Text style={[styles.addButtonText, { color: colors.primaryText }]}>Add to Today</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -310,6 +555,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  secondaryTrigger: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
   addTriggerText: {
     fontWeight: '600',
   },
@@ -323,11 +575,25 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     height: 130,
   },
+  smallPickerWrapper: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    height: 54,
+    justifyContent: 'center',
+  },
   picker: {
     height: 130,
   },
+  smallPicker: {
+    height: 54,
+  },
   pickerItem: {
     height: 130,
+    fontSize: 12,
+  },
+  smallPickerItem: {
+    height: 54,
     fontSize: 12,
   },
   textInput: {
@@ -389,6 +655,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   error: {
+    fontSize: 12,
+  },
+  aiPreviewCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+  },
+  aiTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  aiSection: {
+    gap: 6,
+  },
+  aiItem: {
+    gap: 2,
+  },
+  aiItemTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  aiMuted: {
     fontSize: 12,
   },
 });

@@ -42,6 +42,7 @@ export type AiChatHistoryItem = {
 
 export type BuildAiChatRequestOptions = {
   systemExtra?: string;
+  outputFormat?: AiChatRequest['outputFormat'];
 };
 
 function buildSystemPrompt(extra?: string): string {
@@ -58,7 +59,7 @@ export function buildAiChatRequest(
   options?: BuildAiChatRequestOptions,
 ): AiChatRequest {
   const system = buildSystemPrompt(options?.systemExtra);
-  const outputFormat: AiChatRequest['outputFormat'] = 'markdown';
+  const outputFormat: AiChatRequest['outputFormat'] = options?.outputFormat ?? 'markdown';
   if (history && history.length > 0) {
     return { text, history, system, outputFormat };
   }

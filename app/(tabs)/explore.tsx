@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
+import type { Theme } from 'react-native-calendars/src/types';
 import { useRouter } from 'expo-router';
 
 import { Colors } from '@/constants/theme';
@@ -90,9 +91,9 @@ export default function HistoryScreen() {
       selectedColor: colors.secondary,
     };
     return marked;
-  }, [summaries, selectedDate, colors.primary]);
+  }, [summaries, selectedDate, colors.primary, colors.secondary]);
 
-  const calendarTheme = useMemo(
+  const calendarTheme = useMemo<Theme>(
     () => ({
       backgroundColor: colors.card,
       calendarBackground: colors.card,

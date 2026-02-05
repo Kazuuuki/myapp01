@@ -16,7 +16,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SessionDetail } from '@/src/models/types';
 import { useUnitPreference } from '@/src/state/unitPreference';
 import { getSessionDetail } from '@/src/usecases/history';
-import { updateSet } from '@/src/repo/setRepo';
+import { deleteSet, updateSet } from '@/src/repo/setRepo';
 import { SetChip } from '@/src/ui/SetChip';
 import { deleteExerciseFromSession } from '@/src/repo/workoutRepo';
 
@@ -50,8 +50,8 @@ export default function SessionDetailScreen() {
     };
   }, [id, loadDetail]);
 
-  const handleUpdateSet = async (setId: string, weight: number, reps: number) => {
-    await updateSet(setId, weight, reps);
+  const handleUpdateSet = async (setId: string, weight: number, reps: number, memo: string | null) => {
+    await updateSet(setId, weight, reps, memo);
     setDetail((current) => {
       if (!current) {
         return current;
@@ -61,8 +61,22 @@ export default function SessionDetailScreen() {
         items: current.items.map((item) => ({
           ...item,
           sets: item.sets.map((set) =>
-            set.id === setId ? { ...set, weight, reps } : set,
+            set.id === setId ? { ...set, weight, reps, memo } : set,
           ),
+        })),
+      };
+    });
+  };
+
+  const handleDeleteSet = async (setId: string) => {
+    await deleteSet(setId);
+    setDetail((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        items: current.items.map((item) => ({
+          ...item,
+          sets: item.sets.filter((set) => set.id !== setId),
         })),
       };
     });
@@ -130,6 +144,7 @@ export default function SessionDetailScreen() {
                   set={set}
                   unit={unit}
                   onUpdate={handleUpdateSet}
+                  onDelete={handleDeleteSet}
                 />
               ))
             )}
