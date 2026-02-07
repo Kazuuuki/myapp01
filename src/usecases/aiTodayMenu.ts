@@ -10,6 +10,7 @@ export type TodayMenuRequestOptions = {
   timeLimitMin?: number;
   todayGoal?: string;
   applyStrategy: 'append' | 'replace';
+  includeWeightSuggestions?: boolean;
 };
 
 export type AiTodayMenu = {
@@ -47,7 +48,8 @@ export const TODAY_MENU_SYSTEM_EXTRA = `
 
 制約:
 - reps は必ず整数（例 8, 10, 12）。範囲表現は禁止。
-- weight は原則 null（ユーザーの履歴が明確にあり、推奨重量を述べる合理性がある場合のみ数値でも可）。
+- weight は kg の数値 or null。<<TODAY_MENU_REQUEST>> の include_weight_suggestions が true の場合のみ数値を入れてよい（それ以外は null）。
+- weight を数値で入れる場合は、<<RECENT_TRAINING_SUMMARY>> の実績（kg×回数）を根拠にし、無理のない安全側の提案にする（不明なら null）。
 - 痛み/違和感の情報がある場合、安全を優先し回避・代替・ボリューム調整を行う。
 - 医療行為ではない旨を warnings に必ず含める。
 `.trim();
@@ -171,6 +173,7 @@ export function buildTodayMenuText(
   const timezone = safeDeviceTimezone();
   const timeLimit = options.timeLimitMin ? String(options.timeLimitMin) : 'unknown';
   const goal = options.todayGoal?.trim() ? options.todayGoal.trim() : 'unknown';
+  const includeWeight = options.includeWeightSuggestions ? 'true' : 'false';
 
   return [
     '<<TODAY_MENU_REQUEST>>',
@@ -179,6 +182,7 @@ export function buildTodayMenuText(
     `time_limit_min: ${timeLimit}`,
     `today_goal: ${goal}`,
     `apply_strategy: ${options.applyStrategy}`,
+    `include_weight_suggestions: ${includeWeight}`,
     'locale: ja-JP',
     `timezone: ${timezone}`,
     '<</TODAY_MENU_REQUEST>>',
@@ -465,7 +469,9 @@ function buildSetMetaMemo(set: AiTodayMenu['items'][number]['sets'][number]): st
 export async function applyAiTodayMenuToSession(
   sessionId: string,
   menu: AiTodayMenu,
+  options?: { weightStrategy?: 'last' | 'ai_or_last' },
 ): Promise<void> {
+  const weightStrategy = options?.weightStrategy ?? 'ai_or_last';
   for (const item of menu.items) {
     const bodyPart = typeof item.bodyPart === 'string' ? item.bodyPart : null;
     const exerciseName = item.exerciseName.trim();
@@ -482,7 +488,11 @@ export async function applyAiTodayMenuToSession(
         continue;
       }
 
-      const weight = set.weight === null ? (lastSet?.weight ?? 0) : (coerceFiniteNumber(set.weight) ?? 0);
+      const weightFromAi = set.weight === null ? null : (coerceFiniteNumber(set.weight) ?? null);
+      const weight =
+        weightStrategy === 'last'
+          ? (lastSet?.weight ?? 0)
+          : (weightFromAi ?? lastSet?.weight ?? 0);
       const memo = joinMemoParts(set.memo ?? null, buildSetMetaMemo(set), item.note ?? null);
       await addSet(sessionId, exercise.id, weight, reps, memo);
     }

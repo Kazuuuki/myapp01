@@ -76,6 +76,7 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
   const [aiTimeLimitKey, setAiTimeLimitKey] = useState<string>('45');
   const [aiGoal, setAiGoal] = useState('');
   const [aiApplyStrategy, setAiApplyStrategy] = useState<TodayMenuRequestOptions['applyStrategy']>('append');
+  const [aiWeightStrategy, setAiWeightStrategy] = useState<'last' | 'ai_or_last'>('last');
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiMenu, setAiMenu] = useState<AiTodayMenu | null>(null);
@@ -198,6 +199,7 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
         timeLimitMin: aiTimeLimitMin(),
         todayGoal: aiGoal.trim() ? aiGoal.trim() : undefined,
         applyStrategy: aiApplyStrategy,
+        includeWeightSuggestions: aiWeightStrategy !== 'last',
       });
       setAiMenu(menu);
     } catch (e) {
@@ -238,7 +240,7 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
           await removeExerciseFromToday(session.id, item.exercise.id);
         }
       }
-      await applyAiTodayMenuToSession(session.id, aiMenu);
+      await applyAiTodayMenuToSession(session.id, aiMenu, { weightStrategy: aiWeightStrategy });
       Alert.alert('Added', 'AI menu was added to today.');
       setIsAiOpen(false);
     } catch (e) {
@@ -251,7 +253,7 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
         // ignore
       }
     }
-  }, [aiApplyStrategy, aiMenu, exercises, refresh, session]);
+  }, [aiApplyStrategy, aiMenu, aiWeightStrategy, exercises, refresh, session]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
@@ -481,6 +483,31 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
                 })}
               </View>
 
+              <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Weight</Text>
+              <View style={styles.segmentRow}>
+                {[
+                  { label: 'Last', value: 'last' as const },
+                  { label: 'AI', value: 'ai_or_last' as const },
+                ].map((item) => {
+                  const selected = aiWeightStrategy === item.value;
+                  return (
+                    <Pressable
+                      key={item.value}
+                      accessibilityRole="button"
+                      onPress={() => setAiWeightStrategy(item.value)}
+                      style={[
+                        styles.segmentButton,
+                        { borderColor: colors.border, backgroundColor: colors.card },
+                        selected && { borderColor: colors.primary, backgroundColor: colors.primary },
+                      ]}>
+                      <Text style={[styles.segmentButtonText, { color: selected ? colors.primaryText : colors.text }]}>
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
               <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Goal (optional)</Text>
               <TextInput
                 value={aiGoal}
@@ -519,7 +546,10 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
                       <View key={`${idx}-${it.exerciseName}`} style={styles.aiItem}>
                         <Text style={[styles.aiItemTitle, { color: colors.text }]}>{it.exerciseName}</Text>
                         <Text style={[styles.aiMuted, { color: colors.mutedText }]}>
-                          sets: {it.sets.map((s) => s.reps).join(', ')}
+                          sets:{' '}
+                          {it.sets
+                            .map((s) => (s.weight === null ? `x${s.reps}` : `${s.weight}x${s.reps}`))
+                            .join(', ')}
                         </Text>
                         {it.note ? <Text style={[styles.aiMuted, { color: colors.mutedText }]}>{it.note}</Text> : null}
                       </View>
