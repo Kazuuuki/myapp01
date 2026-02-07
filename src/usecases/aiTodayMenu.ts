@@ -3,7 +3,7 @@ import { formatUserProfileForPrompt, getUserProfile } from '@/src/usecases/userP
 import { createAiLog } from '@/src/repo/aiLogRepo';
 import { getRecentSessions, getExercisesBySession } from '@/src/repo/workoutRepo';
 import { createExerciseAndAddToToday } from '@/src/usecases/today';
-import { addSet, getLastSetByExercise } from '@/src/repo/setRepo';
+import { addSet, getLastSetByExercise, getSetsBySession, getSetsBySessionAndExercise } from '@/src/repo/setRepo';
 
 export type TodayMenuRequestOptions = {
   selectedBodyPart: string;
@@ -82,12 +82,22 @@ function safeDeviceTimezone(): string {
   return 'UTC';
 }
 
+function formatWeightKg(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+}
+
+function formatSet(weightKg: number, reps: number): string {
+  return `${formatWeightKg(weightKg)}x${reps}`;
+}
+
 export async function buildRecentTrainingSummary(todayDate: string, selectedBodyPart: string): Promise<string> {
   const sessions = await getRecentSessions(12);
   const recent = sessions.filter((session) => session.date < todayDate).slice(0, 5);
 
   if (recent.length === 0) {
     return [
+      'weight_unit: kg',
       'recent_sessions:',
       '(none)',
       '',
@@ -96,23 +106,58 @@ export async function buildRecentTrainingSummary(todayDate: string, selectedBody
     ].join('\n');
   }
 
-  const lines: string[] = ['recent_sessions:'];
+  const lines: string[] = ['weight_unit: kg', 'recent_sessions:'];
   let lastDoneForPart: string | null = null;
+  let lastDoneForPartSessionId: string | null = null;
 
   for (const session of recent) {
     const items = await getExercisesBySession(session.id);
-    const names = items.map((item) => item.exercise.name).slice(0, 6);
+    const sets = await getSetsBySession(session.id);
+    const lastSetByExerciseId = new Map<string, { weight: number; reps: number }>();
+    for (const set of sets) {
+      lastSetByExerciseId.set(set.exerciseId, { weight: set.weight, reps: set.reps });
+    }
+
+    const names = items
+      .slice(0, 6)
+      .map((item) => {
+        const last = lastSetByExerciseId.get(item.exercise.id);
+        if (!last) {
+          return item.exercise.name;
+        }
+        return `${item.exercise.name} (${formatSet(last.weight, last.reps)})`;
+      });
+
     lines.push(`- ${session.date}: ${names.join(', ')}`);
     if (!lastDoneForPart) {
       const didHitPart = items.some((item) => (item.exercise.bodyPart ?? null) === selectedBodyPart);
       if (didHitPart) {
         lastDoneForPart = session.date;
+        lastDoneForPartSessionId = session.id;
       }
     }
   }
 
   lines.push('');
   lines.push(`last_done_for_selected_part: ${lastDoneForPart ?? 'unknown'}`);
+
+  if (lastDoneForPartSessionId) {
+    const items = await getExercisesBySession(lastDoneForPartSessionId);
+    const partExercises = items
+      .filter((item) => (item.exercise.bodyPart ?? null) === selectedBodyPart)
+      .slice(0, 3);
+    if (partExercises.length > 0) {
+      lines.push('');
+      lines.push('selected_part_recent_sets:');
+      for (const item of partExercises) {
+        const exerciseSets = await getSetsBySessionAndExercise(lastDoneForPartSessionId, item.exercise.id);
+        const lastThree = exerciseSets.slice(-3);
+        const formatted = lastThree.map((set) => formatSet(set.weight, set.reps)).join(', ');
+        lines.push(`- ${item.exercise.name}: ${formatted || '(none)'}`);
+      }
+    }
+  }
+
   lines.push('note: 履歴が少ない場合は初心者向け・安全寄りに提案してください');
   return lines.join('\n');
 }

@@ -431,17 +431,54 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
               </View>
 
               <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Time Limit</Text>
-              <View style={[styles.smallPickerWrapper, { backgroundColor: pickerBackground, borderColor: pickerBorder }]}>
-                <Picker
-                  selectedValue={aiTimeLimitKey}
-                  onValueChange={(value) => setAiTimeLimitKey(String(value))}
-                  style={[styles.smallPicker, { color: pickerTextColor }]}
-                  itemStyle={[styles.smallPickerItem, { color: pickerTextColor }]}
-                  dropdownIconColor={pickerTextColor}>
-                  <Picker.Item label="30 min" value="30" color={pickerTextColor} />
-                  <Picker.Item label="45 min" value="45" color={pickerTextColor} />
-                  <Picker.Item label="60 min" value="60" color={pickerTextColor} />
-                </Picker>
+              <View style={styles.segmentRow}>
+                {[
+                  { label: '30 min', value: '30' },
+                  { label: '45 min', value: '45' },
+                  { label: '60 min', value: '60' },
+                ].map((item) => {
+                  const selected = aiTimeLimitKey === item.value;
+                  return (
+                    <Pressable
+                      key={item.value}
+                      accessibilityRole="button"
+                      onPress={() => setAiTimeLimitKey(item.value)}
+                      style={[
+                        styles.segmentButton,
+                        { borderColor: colors.border, backgroundColor: colors.card },
+                        selected && { borderColor: colors.primary, backgroundColor: colors.primary },
+                      ]}>
+                      <Text style={[styles.segmentButtonText, { color: selected ? colors.primaryText : colors.text }]}>
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Add Strategy</Text>
+              <View style={styles.segmentRow}>
+                {[
+                  { label: 'Append', value: 'append' as const },
+                  { label: 'Replace', value: 'replace' as const },
+                ].map((item) => {
+                  const selected = aiApplyStrategy === item.value;
+                  return (
+                    <Pressable
+                      key={item.value}
+                      accessibilityRole="button"
+                      onPress={() => setAiApplyStrategy(item.value)}
+                      style={[
+                        styles.segmentButton,
+                        { borderColor: colors.border, backgroundColor: colors.card },
+                        selected && { borderColor: colors.primary, backgroundColor: colors.primary },
+                      ]}>
+                      <Text style={[styles.segmentButtonText, { color: selected ? colors.primaryText : colors.text }]}>
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
 
               <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Goal (optional)</Text>
@@ -452,19 +489,6 @@ export function SessionDayScreen({ date, title, subtitle, showBack = false }: Pr
                 style={[styles.textInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground }]}
                 placeholderTextColor={colors.mutedText}
               />
-
-              <Text style={[styles.inputLabel, { color: colors.mutedText }]}>Add Strategy</Text>
-              <View style={[styles.smallPickerWrapper, { backgroundColor: pickerBackground, borderColor: pickerBorder }]}>
-                <Picker
-                  selectedValue={aiApplyStrategy}
-                  onValueChange={(value) => setAiApplyStrategy(String(value) as TodayMenuRequestOptions['applyStrategy'])}
-                  style={[styles.smallPicker, { color: pickerTextColor }]}
-                  itemStyle={[styles.smallPickerItem, { color: pickerTextColor }]}
-                  dropdownIconColor={pickerTextColor}>
-                  <Picker.Item label="Append" value="append" color={pickerTextColor} />
-                  <Picker.Item label="Replace" value="replace" color={pickerTextColor} />
-                </Picker>
-              </View>
 
               {aiError ? <Text style={[styles.error, { color: colors.dangerText }]}>{aiError}</Text> : null}
               {aiGenerating ? <ActivityIndicator /> : null}
@@ -575,25 +599,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     height: 130,
   },
-  smallPickerWrapper: {
-    borderWidth: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-    height: 54,
-    justifyContent: 'center',
-  },
   picker: {
     height: 130,
   },
-  smallPicker: {
-    height: 54,
-  },
   pickerItem: {
     height: 130,
-    fontSize: 12,
-  },
-  smallPickerItem: {
-    height: 54,
     fontSize: 12,
   },
   textInput: {
@@ -679,5 +689,21 @@ const styles = StyleSheet.create({
   },
   aiMuted: {
     fontSize: 12,
+  },
+  segmentRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  segmentButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
